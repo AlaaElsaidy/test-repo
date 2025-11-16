@@ -14,4 +14,7 @@ class AppRoutes {
   static const String paymentDetails = "/paymentDetails ";
   static const String done = "/done ";
   static const String doctorSelection = "/doctorSelection ";
+  static const String doctorMain = "/doctorMain";
+  static const String patientMain = "/patientMain";
+  static const String familyMain = "/familyMain";
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../theme/app_theme.dart';
 
 class FamilyProfileScreen extends StatelessWidget {
@@ -51,7 +52,7 @@ class FamilyProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'Emily Smith',
+                    'Margaret Smith',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -60,7 +61,7 @@ class FamilyProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Daughter & Primary Caregiver',
+                    '72 years old',
                     style: TextStyle(
                       fontSize: 16,
                       color: Color(0xFFCFFAFE),
@@ -77,7 +78,7 @@ class FamilyProfileScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
-                      'Caring for Margaret Smith',
+                      'Stage: Early Alzheimer\'s',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -85,94 +86,6 @@ class FamilyProfileScreen extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Patient Info Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Patient Information',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.teal900,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {},
-                          child: const Text('View Profile'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: AppTheme.teal50,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.person,
-                            color: AppTheme.teal600,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Margaret Smith',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.teal900,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                '72 years old',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppTheme.gray600,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Early Alzheimer\'s Stage',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppTheme.teal600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: const BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -188,7 +101,7 @@ class FamilyProfileScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'My Contact Information',
+                          'Contact Information',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -205,15 +118,22 @@ class FamilyProfileScreen extends StatelessWidget {
                     _InfoRow(
                       icon: Icons.phone,
                       label: 'Phone',
-                      value: '+1 (555) 987-6543',
+                      value: '+1 (555) 123-4567',
                       color: AppTheme.teal500,
                     ),
                     const SizedBox(height: 12),
                     _InfoRow(
                       icon: Icons.email,
                       label: 'Email',
-                      value: 'emily.smith@email.com',
+                      value: 'margaret.smith@email.com',
                       color: AppTheme.cyan500,
+                    ),
+                    const SizedBox(height: 12),
+                    _InfoRow(
+                      icon: Icons.location_on,
+                      label: 'Address',
+                      value: '123 Oak Street, Springfield',
+                      color: AppTheme.teal500,
                     ),
                   ],
                 ),
@@ -221,60 +141,107 @@ class FamilyProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Doctor Contact Card
-            Card(
-              color: AppTheme.cyan50,
-              child: InkWell(
-                onTap: () {},
+            // Emergency Contact
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFEF3C7), Color(0xFFFED7AA)],
+                ),
                 borderRadius: BorderRadius.circular(16),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppTheme.cyan500,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.medical_services,
-                          color: Colors.white,
-                          size: 24,
+                      const Text(
+                        'Emergency Contact',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Doctor Contact',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.teal900,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Dr. Sarah Johnson',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppTheme.cyan600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.phone,
-                        color: AppTheme.cyan600,
+                      TextButton(
+                        onPressed: () {},
+                        child: const Text('Edit'),
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.people,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Emily Smith',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange,
+                            ),
+                          ),
+                          Text(
+                            'Daughter',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.orange,
+                            ),
+                          ),
+                          Text(
+                            '+1 (555) 987-6543',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Settings (بعد إزالة Privacy & Security و Edit Profile)
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.teal50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.notifications,
+                        color: AppTheme.teal600,
+                      ),
+                    ),
+                    title: const Text('Notifications'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {},
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),

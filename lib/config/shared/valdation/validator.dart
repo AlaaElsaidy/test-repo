@@ -41,3 +41,19 @@ String? confirmPasswordValidator(String? value, String password) {
   }
   return null;
 }
+
+String? phoneValidator(String? value) {
+  if (value == null || value.trim().isEmpty) {
+    return 'Please enter your phone number';
+  }
+
+  final trimmed = value.trim();
+
+  final pattern = RegExp(r'^(010|011|012|015)[0-9]{8}$');
+
+  if (!pattern.hasMatch(trimmed)) {
+    return 'Enter a valid Egyptian phone number';
+  }
+
+  return null;
+}
