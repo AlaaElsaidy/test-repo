@@ -52,7 +52,7 @@ class FamilyProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'Margaret Smith',
+                    'Emily Smith',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -61,7 +61,7 @@ class FamilyProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    '72 years old',
+                    'Daughter & Primary Caregiver',
                     style: TextStyle(
                       fontSize: 16,
                       color: Color(0xFFCFFAFE),
@@ -78,7 +78,7 @@ class FamilyProfileScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
-                      'Stage: Early Alzheimer\'s',
+                      'Caring for Margaret Smith',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -86,6 +86,94 @@ class FamilyProfileScreen extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Patient Info Card
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Patient Information',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.teal900,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {},
+                          child: const Text('View Profile'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: AppTheme.teal50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.person,
+                            color: AppTheme.teal600,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Margaret Smith',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.teal900,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                '72 years old',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppTheme.gray600,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Early Alzheimer\'s Stage',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppTheme.teal600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -101,7 +189,7 @@ class FamilyProfileScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Contact Information',
+                          'My Contact Information',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -118,22 +206,15 @@ class FamilyProfileScreen extends StatelessWidget {
                     _InfoRow(
                       icon: Icons.phone,
                       label: 'Phone',
-                      value: '+1 (555) 123-4567',
+                      value: '+1 (555) 987-6543',
                       color: AppTheme.teal500,
                     ),
                     const SizedBox(height: 12),
                     _InfoRow(
                       icon: Icons.email,
                       label: 'Email',
-                      value: 'margaret.smith@email.com',
+                      value: 'emily.smith@email.com',
                       color: AppTheme.cyan500,
-                    ),
-                    const SizedBox(height: 12),
-                    _InfoRow(
-                      icon: Icons.location_on,
-                      label: 'Address',
-                      value: '123 Oak Street, Springfield',
-                      color: AppTheme.teal500,
                     ),
                   ],
                 ),
@@ -141,87 +222,65 @@ class FamilyProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Emergency Contact
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFEF3C7), Color(0xFFFED7AA)],
-                ),
+            // Doctor Contact Card
+            Card(
+              color: AppTheme.cyan50,
+              child: InkWell(
+                onTap: () {},
                 borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Emergency Contact',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {},
-                        child: const Text('Edit'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
                     children: [
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.orange,
-                          borderRadius: BorderRadius.circular(10),
+                          color: AppTheme.cyan500,
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
-                          Icons.people,
+                          Icons.medical_services,
                           color: Colors.white,
-                          size: 20,
+                          size: 24,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Emily Smith',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.orange,
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Doctor Contact',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.teal900,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'Daughter',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.orange,
+                            SizedBox(height: 4),
+                            Text(
+                              'Dr. Sarah Johnson',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.cyan600,
+                              ),
                             ),
-                          ),
-                          Text(
-                            '+1 (555) 987-6543',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.orange,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.phone,
+                        color: AppTheme.cyan600,
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
 
-            // Settings (بعد إزالة Privacy & Security و Edit Profile)
+            // Settings
             Card(
               child: Column(
                 children: [
@@ -238,6 +297,60 @@ class FamilyProfileScreen extends StatelessWidget {
                       ),
                     ),
                     title: const Text('Notifications'),
+                    subtitle: const Text('Manage alert settings'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {},
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.cyan50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.shield,
+                        color: AppTheme.cyan600,
+                      ),
+                    ),
+                    title: const Text('Safe Zone Settings'),
+                    subtitle: const Text('Configure safe locations'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {},
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.teal50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.security,
+                        color: AppTheme.teal600,
+                      ),
+                    ),
+                    title: const Text('Privacy & Security'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {},
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.cyan50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.help,
+                        color: AppTheme.cyan600,
+                      ),
+                    ),
+                    title: const Text('Help & Support'),
+                    subtitle: const Text('Get caregiver assistance'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {},
                   ),

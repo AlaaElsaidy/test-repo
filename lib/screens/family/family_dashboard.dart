@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+
 import '../../theme/app_theme.dart';
 
 class FamilyDashboard extends StatelessWidget {
@@ -246,7 +247,6 @@ class FamilyDashboard extends StatelessWidget {
 class VideoTip {
   final String title;
   final String youtubeId;
-
   const VideoTip({required this.title, required this.youtubeId});
 
   String get thumbUrl => 'https://img.youtube.com/vi/$youtubeId/0.jpg';
@@ -304,7 +304,6 @@ class VideoTipsSection extends StatelessWidget {
 class _VideoTipCard extends StatelessWidget {
   final VideoTip tip;
   final VoidCallback onTap;
-
   const _VideoTipCard({required this.tip, required this.onTap});
 
   @override
@@ -381,7 +380,6 @@ class _VideoTipCard extends StatelessWidget {
 
 class VideoTipPlayerScreen extends StatefulWidget {
   final VideoTip tip;
-
   const VideoTipPlayerScreen({super.key, required this.tip});
 
   @override

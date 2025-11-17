@@ -2,7 +2,7 @@ import 'package:alzcare/config/router/routes.dart';
 import 'package:flutter/material.dart';
 
 import '../../login/presentation/pages/login.dart';
-import '../../screens/doctor/doctor_main_screen(1).dart';
+import '../../screens/doctor/doctor_main_screen.dart';
 import '../../screens/family/doctors-selection/presentation/pages/doctorScreen.dart';
 import '../../screens/family/family_main_screen.dart';
 import '../../screens/family/payment/presentation/pages/payment-screen.dart';

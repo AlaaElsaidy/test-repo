@@ -1,8 +1,10 @@
 import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../theme/app_theme.dart';
 
 class FamilyTrackingScreen extends StatefulWidget {
@@ -566,7 +568,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
           Expanded(
             child: _selectedTab == 0
                 ? _LiveTrackingView(
-              isInsideAny: _isInsideAnyActiveZone,
+                    isInsideAny: _isInsideAnyActiveZone,
                     statusText:
                         _isInsideAnyActiveZone ? 'Safe Zone' : 'Outside Zone',
                     statusColor:
@@ -1298,7 +1300,6 @@ class _SafeZoneCardRow extends StatelessWidget {
 class _LabeledField extends StatelessWidget {
   final String label;
   final Widget child;
-
   const _LabeledField({required this.label, required this.child});
 
   @override

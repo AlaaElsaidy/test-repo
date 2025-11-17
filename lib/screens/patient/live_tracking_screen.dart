@@ -1,9 +1,11 @@
 import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../theme/app_theme.dart';
 
 class LiveTrackingScreen extends StatefulWidget {
@@ -212,7 +214,6 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   }
 
   double _deg2rad(double d) => d * pi / 180.0;
-
   double _distanceMeters(double lat1, double lng1, double lat2, double lng2) {
     const r = 6371000.0;
     final dLat = _deg2rad(lat2 - lat1);
@@ -571,7 +572,6 @@ class _SafeZone {
   final double lng;
   final double radiusMeters;
   final bool isActive;
-
   const _SafeZone({
     required this.name,
     required this.lat,

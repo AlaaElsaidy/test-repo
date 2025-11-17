@@ -14,14 +14,15 @@ const LinearGradient kTealGradient = LinearGradient(
   end: Alignment.bottomRight,
 );
 
-class MemoryActivitiesScreen extends StatefulWidget {
-  const MemoryActivitiesScreen({super.key});
+class FamilyActivitiesScreen extends StatefulWidget {
+  const FamilyActivitiesScreen({super.key});
 
   @override
-  State<MemoryActivitiesScreen> createState() => _MemoryActivitiesScreenState();
+  State<FamilyActivitiesScreen> createState() => _FamilyActivitiesScreenState();
 }
 
-class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
+class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
+  // بيانات تشمل اليوم وأيام لاحقة للـ Schedule
   final List<Map<String, dynamic>> activities = [
     {
       'name': 'Breakfast',
@@ -97,6 +98,57 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
     return list;
   }
 
+  // CRUD helpers
+  Future<bool> _confirmDelete() async {
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Confirm Delete'),
+        content: const Text('Are you sure you want to delete this activity?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    return res == true;
+  }
+
+  Future<void> _deleteActivity(Map<String, dynamic> activity) async {
+    if (!await _confirmDelete()) return;
+    setState(() {
+      final idx = activities.indexOf(activity);
+      if (idx != -1) activities.removeAt(idx);
+    });
+  }
+
+  Future<void> _openEdit(Map<String, dynamic> activity) async {
+    final updated = await Navigator.push<Map<String, dynamic>?>(
+      context,
+      MaterialPageRoute(builder: (_) => EditActivitiesView(activity: activity)),
+    );
+    if (updated != null) {
+      setState(() {
+        final idx = activities.indexOf(activity);
+        if (idx != -1) activities[idx] = updated;
+      });
+    }
+  }
+
+  Future<void> _addNew() async {
+    final newActivity = await Navigator.push<Map<String, dynamic>?>(
+      context,
+      MaterialPageRoute(builder: (_) => const EditActivitiesView()),
+    );
+    if (newActivity != null) {
+      setState(() => activities.add(newActivity));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final todayList = _activitiesForDay(DateTime.now());
@@ -115,30 +167,34 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header (أيقونة للزينة فقط)
-          const Padding(
-            padding: EdgeInsets.all(16),
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Memory Activities',
-                      style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: kTeal900)),
-                  SizedBox(height: 4),
-                  Text('Keep your mind active and engaged',
-                      style: TextStyle(fontSize: 14, color: kGray600)),
-                ]),
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Memory Activities',
+                        style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: kTeal900)),
+                    SizedBox(height: 4),
+                    Text('Keep your mind active and engaged',
+                        style: TextStyle(fontSize: 14, color: kGray600)),
+                  ],
+                ),
+                // زر إضافة: +
+                GestureDetector(
+                  onTap: _addNew,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: const BoxDecoration(
                         gradient: kTealGradient, shape: BoxShape.circle),
-                    child:
-                        Icon(Icons.auto_awesome, color: Colors.white, size: 24),
+                    child: const Icon(Icons.add, color: Colors.white, size: 28),
                   ),
                 ),
               ],
@@ -183,7 +239,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                           total: todayTotal,
                           progress: todayProgress),
                       const SizedBox(height: 16),
-                      Expanded(child: _buildPatientList(todayList)),
+                      Expanded(child: _buildFamilyList(todayList)),
                     ],
                   ),
                 ),
@@ -297,7 +353,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                           total: selectedTotal,
                           progress: selectedProgress),
                       const SizedBox(height: 12),
-                      Expanded(child: _buildPatientList(selectedList)),
+                      Expanded(child: _buildFamilyList(selectedList)),
                     ],
                   ),
                 ),
@@ -309,7 +365,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
     );
   }
 
-  Widget _buildPatientList(List<Map<String, dynamic>> list) {
+  Widget _buildFamilyList(List<Map<String, dynamic>> list) {
     if (list.isEmpty) {
       return const Center(
           child:
@@ -328,23 +384,70 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: GestureDetector(
-            // المريض: Toggle Done فقط
-            onTap: () {
-              if (idx != -1) {
-                setState(() => activities[idx]['done'] =
-                    !(activities[idx]['done'] == true));
-              }
-            },
-            child: _ActivityCard(
-              title: activity['name'] ?? '',
-              description: activity['description'] ?? '',
-              icon: Icons.psychology,
-              date: dateStr,
-              time: (activity['time'] ?? '').toString(),
-              completed: completed,
-              color: color,
-            ),
+          child: Stack(
+            children: [
+              // الكارت
+              GestureDetector(
+                onTap: () => _openEdit(activity), // Edit
+                onDoubleTap: () {
+                  // Toggle Done
+                  if (idx != -1) {
+                    setState(() => activities[idx]['done'] =
+                        !(activities[idx]['done'] == true));
+                  }
+                },
+                child: _ActivityCard(
+                  title: activity['name'] ?? '',
+                  description: activity['description'] ?? '',
+                  icon: Icons.psychology,
+                  date: dateStr,
+                  time: (activity['time'] ?? '').toString(),
+                  completed: completed,
+                  color: color,
+                ),
+              ),
+
+              // قائمة 3 نقط (Edit/Delete)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Material(
+                  color: Colors.transparent,
+                  child: PopupMenuButton<String>(
+                    onSelected: (v) {
+                      if (v == 'edit') {
+                        _openEdit(activity);
+                      } else if (v == 'delete') {
+                        _deleteActivity(activity);
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete'),
+                          ],
+                        ),
+                      ),
+                    ],
+                    icon: const Icon(Icons.more_vert, color: kTeal900),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -474,6 +577,184 @@ class _ActivityCard extends StatelessWidget {
               child: Icon(Icons.check_circle, color: Colors.green),
             ),
         ],
+      ),
+    );
+  }
+}
+
+// ============== Edit Activities (بدون صور/نقاط/صعوبات) ==============
+class EditActivitiesView extends StatefulWidget {
+  final Map<String, dynamic>? activity;
+
+  const EditActivitiesView({super.key, this.activity});
+
+  @override
+  State<EditActivitiesView> createState() => _EditActivitiesViewState();
+}
+
+class _EditActivitiesViewState extends State<EditActivitiesView> {
+  late TextEditingController _nameCtrl;
+  late TextEditingController _descCtrl;
+  TimeOfDay _selectedTime = const TimeOfDay(hour: 7, minute: 0);
+  String _reminderType = 'alarm';
+  DateTime? _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.activity?['name'] ?? '');
+    _descCtrl =
+        TextEditingController(text: widget.activity?['description'] ?? '');
+    _reminderType = widget.activity?['reminderType'] ?? 'alarm';
+    _selectedDate = widget.activity?['date'] ?? DateTime.now();
+
+    final incomingTime = widget.activity?['time'];
+    if (incomingTime is TimeOfDay) {
+      _selectedTime = incomingTime;
+    } else if (incomingTime is String && incomingTime.isNotEmpty) {
+      try {
+        final parsed = DateFormat('h:mm a').parse(incomingTime);
+        _selectedTime = TimeOfDay.fromDateTime(parsed);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final t =
+        await showTimePicker(context: context, initialTime: _selectedTime);
+    if (t != null) setState(() => _selectedTime = t);
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now,
+      firstDate: DateTime(2025),
+      lastDate: DateTime(2100),
+    );
+    if (d != null) setState(() => _selectedDate = d);
+  }
+
+  void _save() {
+    if (_nameCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter activity name')));
+      return;
+    }
+    final formattedTime = _selectedTime.format(context);
+    final m = {
+      'name': _nameCtrl.text.trim(),
+      'description': _descCtrl.text.trim(),
+      'done': widget.activity?['done'] ?? false,
+      'time': formattedTime,
+      'reminderType': _reminderType,
+      'date': _selectedDate ?? DateTime.now(),
+    };
+    Navigator.pop(context, m);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Text(widget.activity == null ? 'Add Activity' : 'Edit Activity',
+            style:
+                const TextStyle(color: kTeal500, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+            onPressed: () => Navigator.pop(context)),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: SingleChildScrollView(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            TextField(
+              controller: _nameCtrl,
+              decoration: const InputDecoration(
+                  labelText: 'Activity Name', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                  labelText: 'Description', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              title: Text('Time: ${_selectedTime.format(context)}'),
+              trailing: const Icon(Icons.access_time),
+              onTap: _pickTime,
+            ),
+            ListTile(
+              title: Text(_selectedDate != null
+                  ? 'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate!)}'
+                  : 'Select Date'),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: _pickDate,
+            ),
+            const Text('Reminder type',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Row(children: [
+              _ReminderChip(
+                  label: 'Alarm',
+                  icon: Icons.alarm,
+                  selected: _reminderType == 'alarm',
+                  onTap: () => setState(() => _reminderType = 'alarm')),
+              const SizedBox(width: 12),
+              _ReminderChip(
+                  label: 'Vibrate',
+                  icon: Icons.notifications_active,
+                  selected: _reminderType == 'vibrate',
+                  onTap: () => setState(() => _reminderType = 'vibrate')),
+            ]),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _save,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: kTeal500,
+                  minimumSize: const Size(double.infinity, 48)),
+              child: const Text('Save', style: TextStyle(color: Colors.white)),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ReminderChip(
+      {required this.label,
+      required this.icon,
+      required this.selected,
+      required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+              color: selected ? kTeal500 : Colors.grey.shade400,
+              width: selected ? 2 : 1),
+        ),
+        child: Icon(icon, color: selected ? kTeal500 : Colors.grey, size: 22),
       ),
     );
   }

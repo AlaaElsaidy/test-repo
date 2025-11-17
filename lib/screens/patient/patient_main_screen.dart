@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+
 import '../../theme/app_theme.dart';
-import 'patient_dashboard.dart';
-import 'memory_activities_screen.dart';
-import 'live_tracking_screen.dart';
 import 'chat_with_doctor_screen.dart';
-import 'patient_profile_screen.dart';
+import 'live_tracking_screen.dart';
+import 'memory_activities_screen.dart';
+import 'patient_dashboard.dart';
+import 'patient_profile_screen.dart'; // ADDED: نحتاجه عشان نمرّر Patient
 
 class PatientMainScreen extends StatefulWidget {
   const PatientMainScreen({super.key});
@@ -16,13 +17,40 @@ class PatientMainScreen extends StatefulWidget {
 class _PatientMainScreenState extends State<PatientMainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const PatientDashboard(),
-    const MemoryActivitiesScreen(),
-    const LiveTrackingScreen(),
-    const ChatWithDoctorScreen(),
-    const PatientProfileScreen(),
-  ];
+  // ADDED: نموذج مريض تجريبي — تقدري تبدّليه بأي بيانات حقيقية أو توصليه بـ Provider/API
+  late final Patient _patient;
+
+  // CHANGED: بدل ما تبقى قائمة ثابتة، هنجهّزها في initState بعد بناء المريض
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ADDED: بيانات مريض افتراضية
+    _patient = const Patient(
+      name: 'Margaret Smith',
+      age: 72,
+      // مش بتظهر في الـ UI
+      phone: '+1 (555) 123-4567',
+      email: 'margaret.smith@email.com',
+      address: '123 Oak Street, Springfield',
+      emergencyContact: EmergencyContact(
+        name: 'Emily Smith',
+        relation: 'Daughter',
+        phone: '+1 (555) 987-6543',
+      ),
+    );
+
+    // ADDED: بناء الشاشات وتمرير المريض للبروفايل
+    _screens = [
+      const PatientDashboard(),
+      const MemoryActivitiesScreen(),
+      const LiveTrackingScreen(),
+      const ChatWithDoctorScreen(),
+      PatientProfileScreen(patient: _patient), // ADDED: تمرير patient
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +59,11 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
         decoration: const BoxDecoration(
           gradient: AppTheme.lightGradient,
         ),
-        child: _screens[_currentIndex],
+        // CHANGED: IndexedStack لحفظ حالة كل تبويب بدل ما يعاد بناؤه كل مرة
+        child: IndexedStack(
+          index: _currentIndex,
+          children: _screens,
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -65,7 +97,7 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
 
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
-    
+
     return InkWell(
       onTap: () => setState(() => _currentIndex = index),
       borderRadius: BorderRadius.circular(12),

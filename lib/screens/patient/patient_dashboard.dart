@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io'; // ADDED
 import 'dart:math';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart'; // ADDED
+
 import '../../theme/app_theme.dart';
 
 class PatientDashboard extends StatefulWidget {
@@ -36,10 +39,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
   // UX settings
   GameMode _mode = GameMode.calm;
-  bool _soundOn = true;
-  bool _hapticsOn = true;
-  bool _highContrast = false;
   double _scale = 1.0; // 0.9..1.5
+
+  // Avatar (pick from camera/gallery)
+  final ImagePicker _picker = ImagePicker(); // ADDED
+  File? _avatarFile; // ADDED
 
   @override
   void initState() {
@@ -63,9 +67,24 @@ class _PatientDashboardState extends State<PatientDashboard> {
     _cancelTimers();
     // Build values list
     final fullSet = [
-      '🍓', '🍇', '🍎', '🍌', '🍊', '🥝',
-      '🍉', '🍍', '🍐', '🍑', '🍒', '🍈',
-      '🥕', '🌽', '🍆', '🍋', '🫐', '🥑', // احتياطي لو زودنا أزواج لاحقًا
+      '🍓',
+      '🍇',
+      '🍎',
+      '🍌',
+      '🍊',
+      '🥝',
+      '🍉',
+      '🍍',
+      '🍐',
+      '🍑',
+      '🍒',
+      '🍈',
+      '🥕',
+      '🌽',
+      '🍆',
+      '🍋',
+      '🫐',
+      '🥑',
     ];
     final base = fullSet.take(_pairsCount).toList();
     final values = [...base, ...base]..shuffle(Random());
@@ -143,12 +162,10 @@ class _PatientDashboardState extends State<PatientDashboard> {
           a.matched = true;
           b.matched = true;
         });
-        _feedback(matched: true);
         _flipped.clear();
         _lock = false;
         _checkWin();
       } else {
-        _feedback(matched: false);
         Future.delayed(const Duration(milliseconds: 700), () {
           if (!mounted) return;
           setState(() {
@@ -159,28 +176,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
           _lock = false;
         });
       }
-    } else {
-      // single flip feedback
-      if (_hapticsOn) HapticFeedback.lightImpact();
-      if (_soundOn) SystemSound.play(SystemSoundType.click);
-    }
-  }
-
-  void _feedback({required bool matched}) {
-    if (_hapticsOn) {
-      matched ? HapticFeedback.mediumImpact() : HapticFeedback.heavyImpact();
-    }
-    if (_soundOn) {
-      matched
-          ? SystemSound.play(SystemSoundType.click)
-          : SystemSound.play(SystemSoundType.alert);
     }
   }
 
   void _checkWin() {
     final won = _cards.every((c) => c.matched);
     if (won) {
-      // Stop game timer
       _gameTimer?.cancel();
 
       int stars = 0;
@@ -211,12 +212,66 @@ class _PatientDashboardState extends State<PatientDashboard> {
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  Color get _faceDownColor =>
-      _highContrast ? Colors.blue.shade900 : AppTheme.teal600;
+  Color get _faceDownColor => AppTheme.teal600;
 
   double get _cardRadius => 16 * _scale;
 
   double get _emojiSize => 28 * _scale;
+
+  // Avatar helpers
+  void _openAvatarSheet() {
+    // ADDED
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Take a photo'),
+              onTap: () => _pickImage(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from gallery'),
+              onTap: () => _pickImage(ImageSource.gallery),
+            ),
+            if (_avatarFile != null)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Remove photo'),
+                onTap: () {
+                  setState(() => _avatarFile = null);
+                  Navigator.of(context).maybePop();
+                },
+              ),
+            const SizedBox(height: 6),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    // ADDED
+    try {
+      final XFile? picked = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1024,
+      );
+      if (picked != null) {
+        setState(() => _avatarFile = File(picked.path));
+      }
+      if (mounted) Navigator.of(context).maybePop();
+    } catch (e) {
+      debugPrint('Image pick error: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -236,11 +291,39 @@ class _PatientDashboardState extends State<PatientDashboard> {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 28 * _scale,
-                    backgroundColor: Colors.white.withOpacity(0.9),
-                    child: const Icon(Icons.person,
-                        color: AppTheme.teal600, size: 32),
+                  // Avatar with picker
+                  Stack(
+                    // ADDED
+                    clipBehavior: Clip.none,
+                    children: [
+                      GestureDetector(
+                        onTap: _openAvatarSheet,
+                        child: CircleAvatar(
+                          radius: 28 * _scale,
+                          backgroundColor: Colors.white.withOpacity(0.9),
+                          backgroundImage: _avatarFile != null
+                              ? FileImage(_avatarFile!)
+                              : null,
+                          child: _avatarFile == null
+                              ? const Icon(Icons.person,
+                                  color: AppTheme.teal600, size: 32)
+                              : null,
+                        ),
+                      ),
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.edit,
+                              color: AppTheme.teal600, size: 14),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -266,13 +349,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       ],
                     ),
                   ),
-                  // Mode switcher menu icon optional
                 ],
               ),
             ),
             const SizedBox(height: 12),
 
-            // Controls row: Mode + toggles + scale + contrast
+            // Controls row: Mode + scale
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -296,24 +378,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       _initGame();
                     }
                   },
-                ),
-                FilterChip(
-                  label: Text(_soundOn ? 'Sound On' : 'Sound Off'),
-                  selected: _soundOn,
-                  onSelected: (v) => setState(() => _soundOn = v),
-                  avatar: Icon(_soundOn ? Icons.volume_up : Icons.volume_off),
-                ),
-                FilterChip(
-                  label: Text(_hapticsOn ? 'Haptics On' : 'Haptics Off'),
-                  selected: _hapticsOn,
-                  onSelected: (v) => setState(() => _hapticsOn = v),
-                  avatar: const Icon(Icons.vibration),
-                ),
-                FilterChip(
-                  label: const Text('High Contrast'),
-                  selected: _highContrast,
-                  onSelected: (v) => setState(() => _highContrast = v),
-                  avatar: const Icon(Icons.tonality),
                 ),
                 ActionChip(
                   label: const Text('A-'),
@@ -454,7 +518,6 @@ class _MemoryCard {
   final String value;
   bool revealed;
   bool matched;
-
   _MemoryCard({
     required this.value,
     this.revealed = false,

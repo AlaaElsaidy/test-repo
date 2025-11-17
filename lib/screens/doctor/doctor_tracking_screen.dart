@@ -1,8 +1,10 @@
 import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart'; // still used elsewhere
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../theme/app_theme.dart';
 
 class DoctorTrackingScreen extends StatefulWidget {
@@ -803,7 +805,6 @@ class _DoctorTrackingScreenState extends State<DoctorTrackingScreen> {
 class _LatLng {
   final double lat;
   final double lng;
-
   const _LatLng(this.lat, this.lng);
 }
 
