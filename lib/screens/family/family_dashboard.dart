@@ -1,3 +1,5 @@
+import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
+import 'package:alzcare/core/supabase/patient-family-service.dart';
 import 'package:flutter/material.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
@@ -5,6 +7,23 @@ import '../../theme/app_theme.dart';
 
 class FamilyDashboard extends StatelessWidget {
   const FamilyDashboard({super.key});
+
+  Future<List<Map<String, dynamic>>> _loadLinkedPatients() async {
+    try {
+      final familyUid = SharedPrefsHelper.getString("familyUid");
+      if (familyUid == null) {
+        // Try userId if familyUid not found
+        final userId = SharedPrefsHelper.getString("userId");
+        if (userId == null) return [];
+        final service = PatientFamilyService();
+        return await service.getPatientsByFamily(userId);
+      }
+      final service = PatientFamilyService();
+      return await service.getPatientsByFamily(familyUid);
+    } catch (e) {
+      return [];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -158,6 +177,120 @@ class FamilyDashboard extends StatelessWidget {
                     TextButton(
                       onPressed: () {},
                       child: const Text('Read More Tips'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Linked Patients section
+            Card(
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.teal500,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Linked Patients',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.teal900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    FutureBuilder<List<Map<String, dynamic>>>(
+                      future: _loadLinkedPatients(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
+
+                        if (snapshot.hasError) {
+                          return const Text(
+                            'Error loading patients',
+                            style: TextStyle(color: Colors.red),
+                          );
+                        }
+
+                        final patients = snapshot.data ?? [];
+
+                        if (patients.isEmpty) {
+                          return const Text(
+                            'No patients linked yet',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.gray500,
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          children: patients.map((patientData) {
+                            final patient = patientData['patients']
+                                as Map<String, dynamic>?;
+                            if (patient == null) return const SizedBox();
+
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: CircleAvatar(
+                                backgroundColor: AppTheme.teal100,
+                                child: patient['photo_url'] != null
+                                    ? ClipOval(
+                                        child: Image.network(
+                                          patient['photo_url'],
+                                          width: 40,
+                                          height: 40,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      )
+                                    : Icon(Icons.person,
+                                        color: AppTheme.teal600),
+                              ),
+                              title: Text(
+                                patient['name'] ?? 'Unknown',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Age: ${patient['age'] ?? 'N/A'} | ${patient['gender'] ?? ''}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              trailing: patientData['relation_type'] != null
+                                  ? Chip(
+                                      label: Text(
+                                        patientData['relation_type'],
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                      backgroundColor: AppTheme.teal50,
+                                    )
+                                  : null,
+                            );
+                          }).toList(),
+                        );
+                      },
                     ),
                   ],
                 ),

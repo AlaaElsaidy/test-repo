@@ -79,6 +79,14 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                   context: context);
             }
             if (state is PatientDetailsSuccess) {
+              // Ensure patientUid is saved
+              final patientUid = SharedPrefsHelper.getString("patientUid");
+              if (patientUid == null) {
+                final userId = SharedPrefsHelper.getString("userId");
+                if (userId != null) {
+                  await SharedPrefsHelper.saveString("patientUid", userId);
+                }
+              }
               Navigator.pushReplacementNamed(context, AppRoutes.service);
             }
           },
@@ -116,12 +124,12 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                               final picked =
                                   await pickImage(source: ImageSource.gallery);
                               if (picked != null) {
-                                await BlocProvider.of<PatientDetailsCubit>(
-                                        context)
-                                    .uploadPhoto(
-                                        SharedPrefsHelper.getString(
-                                            "familyUid")!,
-                                        picked);
+                                final patientUid = SharedPrefsHelper.getString("patientUid");
+                                if (patientUid != null) {
+                                  await BlocProvider.of<PatientDetailsCubit>(
+                                          context)
+                                      .uploadPhoto(patientUid, picked);
+                                }
                               }
                             },
                             imagePath: imagePath,

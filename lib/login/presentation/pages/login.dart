@@ -73,6 +73,8 @@ class _SignInScreenState extends State<SignInScreen> {
             if (state is GetUserSuccess) {
               var user = UserModel.fromJson(state.user!);
               if (user.role == "patient") {
+                await SharedPrefsHelper.saveString(
+                    "patientUid", state.user!['id']);
                 Navigator.pushNamedAndRemoveUntil(
                   context,
                   AppRoutes.patientDetails,

@@ -14,16 +14,16 @@
 #include <url_launcher_windows/url_launcher_windows.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
-    AppLinksPluginCApiRegisterWithRegistrar(
-            registry->GetRegistrarForPlugin("AppLinksPluginCApi"));
-    EmojiPickerFlutterPluginCApiRegisterWithRegistrar(
-            registry->GetRegistrarForPlugin("EmojiPickerFlutterPluginCApi"));
-    FileSelectorWindowsRegisterWithRegistrar(
-            registry->GetRegistrarForPlugin("FileSelectorWindows"));
-    GeolocatorWindowsRegisterWithRegistrar(
-            registry->GetRegistrarForPlugin("GeolocatorWindows"));
-    SharePlusWindowsPluginCApiRegisterWithRegistrar(
-            registry->GetRegistrarForPlugin("SharePlusWindowsPluginCApi"));
-    UrlLauncherWindowsRegisterWithRegistrar(
-            registry->GetRegistrarForPlugin("UrlLauncherWindows"));
+  AppLinksPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("AppLinksPluginCApi"));
+  EmojiPickerFlutterPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("EmojiPickerFlutterPluginCApi"));
+  FileSelectorWindowsRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("FileSelectorWindows"));
+  GeolocatorWindowsRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("GeolocatorWindows"));
+  SharePlusWindowsPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("SharePlusWindowsPluginCApi"));
+  UrlLauncherWindowsRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("UrlLauncherWindows"));
 }

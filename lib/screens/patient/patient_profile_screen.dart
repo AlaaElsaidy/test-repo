@@ -1,6 +1,16 @@
 import 'dart:io';
 
+import 'package:alzcare/config/shared/widgets/error-dialoge.dart';
+import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
+import 'package:alzcare/core/supabase/invitation-service.dart';
+import 'package:alzcare/core/supabase/patient-family-service.dart';
+import 'package:alzcare/core/supabase/supabase-service.dart';
+import 'package:alzcare/screens/patient/invitations/data/invitation-repo.dart';
+import 'package:alzcare/screens/patient/invitations/presentation/cubit/invitation_cubit.dart';
+import 'package:alzcare/screens/patient/invitations/presentation/cubit/invitation_state.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -61,8 +71,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
 
   String tr(String en, String ar) => _isAr ? ar : en;
 
-  // Invite link (replace with your real invite link)
-  static const String _inviteLink = 'https://example.com/invite?code=ABC123';
+  String? _currentInvitationLink;
 
   @override
   void initState() {
@@ -239,9 +248,10 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   }
 
   String _buildInviteMessage(String name) {
+    final link = _currentInvitationLink ?? 'https://alzcare.app/invite';
     return _isAr
-        ? 'مرحبًا ${name.isEmpty ? '' : name}، تمت إضافتك كقريب للمساعدة في الرعاية. انضم عبر الرابط: $_inviteLink'
-        : 'Hi ${name.isEmpty ? '' : name}, you have been added as a relative to assist with care. Join using this link: $_inviteLink';
+        ? 'مرحبًا ${name.isEmpty ? '' : name}، تمت إضافتك كقريب للمساعدة في الرعاية. انضم عبر الرابط: $link'
+        : 'Hi ${name.isEmpty ? '' : name}, you have been added as a relative to assist with care. Join using this link: $link';
   }
 
   // WhatsApp invite (implemented)
@@ -284,54 +294,156 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(tr('Invite a relative', 'دعوة قريب')),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildTextField(
-                controller: nameCtrl,
-                label: tr('Name', 'الاسم'),
-                icon: Icons.person,
-              ),
-              const SizedBox(height: 10),
-              _buildTextField(
-                controller: phoneCtrl,
-                label: tr('Phone (optional)', 'الهاتف (اختياري)'),
-                icon: Icons.phone,
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 10),
-              _buildTextField(
-                controller: emailCtrl,
-                label: tr('Email (optional)', 'البريد الإلكتروني (اختياري)'),
-                icon: Icons.email,
-                keyboardType: TextInputType.emailAddress,
-              ),
-            ],
+      builder: (ctx) => BlocProvider(
+        create: (context) => InvitationCubit(
+          InvitationRepo(
+            InvitationService(),
+            PatientFamilyService(),
+            UserService(),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(tr('Cancel', 'إلغاء')),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              final name = nameCtrl.text.trim();
-              final phone = phoneCtrl.text.trim();
-              final email = emailCtrl.text.trim();
+        child: BlocListener<InvitationCubit, InvitationState>(
+          listener: (context, state) {
+            if (state is InvitationFailure) {
               Navigator.pop(ctx);
-              _openInviteShareSheet(name: name, phone: phone, email: email);
+              showErrorDialog(
+                context: context,
+                error: state.errorMessage,
+                title: "Error",
+              );
+            } else if (state is InvitationSuccess) {
+              _currentInvitationLink =
+                  'https://alzcare.app/invite?code=${state.invitation.invitationCode}';
+              Navigator.pop(ctx);
+              _openInviteShareSheet(
+                name: nameCtrl.text.trim(),
+                phone: phoneCtrl.text.trim(),
+                email: emailCtrl.text.trim(),
+              );
+            }
+          },
+          child: BlocBuilder<InvitationCubit, InvitationState>(
+            builder: (context, state) {
+              return AlertDialog(
+                title: Text(tr('Invite a relative', 'دعوة قريب')),
+                content: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildTextField(
+                          controller: nameCtrl,
+                          label: tr('Name', 'الاسم'),
+                          icon: Icons.person,
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? tr('Name is required', 'الاسم مطلوب')
+                              : null,
+                        ),
+                        const SizedBox(height: 10),
+                        _buildTextField(
+                          controller: phoneCtrl,
+                          label: tr('Phone (optional)', 'الهاتف (اختياري)'),
+                          icon: Icons.phone,
+                          keyboardType: TextInputType.phone,
+                        ),
+                        const SizedBox(height: 10),
+                        _buildTextField(
+                          controller: emailCtrl,
+                          label: tr('Email (optional)', 'البريد الإلكتروني (اختياري)'),
+                          icon: Icons.email,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (v) {
+                            if (v != null && v.trim().isNotEmpty) {
+                              final emailRegex = RegExp(
+                                  r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                              if (!emailRegex.hasMatch(v.trim())) {
+                                return tr('Invalid email', 'بريد إلكتروني غير صحيح');
+                              }
+                            }
+                            return null;
+                          },
+                        ),
+                        if (phoneCtrl.text.trim().isEmpty &&
+                            emailCtrl.text.trim().isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              tr('Please provide either phone or email',
+                                  'يرجى إدخال رقم الهاتف أو البريد الإلكتروني'),
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(tr('Cancel', 'إلغاء')),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: state is InvitationLoading
+                        ? null
+                        : () {
+                            if (formKey.currentState!.validate()) {
+                              final phone = phoneCtrl.text.trim();
+                              final email = emailCtrl.text.trim();
+
+                              if (phone.isEmpty && email.isEmpty) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  SnackBar(
+                                    content: Text(tr(
+                                        'Please provide either phone or email',
+                                        'يرجى إدخال رقم الهاتف أو البريد الإلكتروني')),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final patientUid =
+                                  SharedPrefsHelper.getString("patientUid");
+                              if (patientUid == null) {
+                                Navigator.pop(ctx);
+                                showErrorDialog(
+                                  context: context,
+                                  error: "Patient ID not found",
+                                  title: "Error",
+                                );
+                                return;
+                              }
+
+                              context.read<InvitationCubit>().createInvitation(
+                                    patientId: patientUid,
+                                    familyMemberEmail:
+                                        email.isNotEmpty ? email : null,
+                                    familyMemberPhone:
+                                        phone.isNotEmpty ? phone : null,
+                                  );
+                            }
+                          },
+                    icon: state is InvitationLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.arrow_forward),
+                    label: Text(tr('Continue', 'متابعة')),
+                  ),
+                ],
+              );
             },
-            icon: const Icon(Icons.arrow_forward),
-            label: Text(tr('Continue', 'متابعة')),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -378,7 +490,14 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
               title: Text(tr('Copy link', 'نسخ الرابط')),
               onTap: () {
                 Navigator.pop(context);
-                _comingSoon();
+                if (_currentInvitationLink != null) {
+                  Clipboard.setData(
+                      ClipboardData(text: _currentInvitationLink!));
+                  _showSnack(tr('Link copied to clipboard', 'تم نسخ الرابط'));
+                } else {
+                  _showSnack(tr('No invitation link available',
+                      'لا يوجد رابط دعوة متاح'));
+                }
               },
             ),
             const SizedBox(height: 6),
@@ -588,76 +707,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
 
                 const SizedBox(height: 12),
 
-                // Invite Relative (separate below settings)
-                Card(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  elevation: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: AppTheme.teal50,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.group_add,
-                                  color: AppTheme.teal600, size: 20),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                tr('Invite a relative', 'دعوة قريب'),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.teal900,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          tr('Send a secure invite to a family member to assist with care.',
-                              'أرسل دعوة آمنة لأحد الأقارب للمساعدة في الرعاية.'),
-                          style: const TextStyle(
-                              fontSize: 12, color: AppTheme.gray500),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton.icon(
-                            onPressed: _openInviteDialog,
-                            icon: const Icon(Icons.person_add_alt_1),
-                            label: Text(tr('Send invite', 'إرسال دعوة')),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.teal600,
-                              foregroundColor: Colors.white,
-                              textStyle: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.w600),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                              elevation: 0,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
                 // Contact Information (view or edit)
                 Card(
                   child: Padding(
@@ -835,6 +884,35 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                         ),
                       ],
                     ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // NOTE: The following tabs were removed per user request:
+                // - Notifications
+                // - Safe Zone Settings
+                // - Privacy & Security
+                // - Help & Support
+                // These tabs should NOT be added back to the patient profile screen.
+
+                // Invite Relative Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: _openInviteDialog,
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: Text(tr('Send invite', 'إرسال دعوة')),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.teal600,
+                      foregroundColor: Colors.white,
+                      textStyle: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
                   ),
                 ),
 

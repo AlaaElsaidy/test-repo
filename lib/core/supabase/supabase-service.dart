@@ -29,6 +29,12 @@ class UserService {
     return response;
   }
 
+  Future<Map<String, dynamic>?> getUserByEmail(String email) async {
+    final response =
+        await _client.from('users').select().eq('email', email).maybeSingle();
+    return response;
+  }
+
   Future<void> updateUser(String userId, Map<String, dynamic> data) async {
     await _client.from('users').update(data).eq('id', userId);
   }

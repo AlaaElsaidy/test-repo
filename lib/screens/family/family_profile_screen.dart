@@ -1,9 +1,343 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/shared/widgets/error-dialoge.dart';
+import '../../core/shared-prefrences/shared-prefrences-helper.dart';
+import '../../core/supabase/invitation-service.dart';
+import '../../core/supabase/patient-family-service.dart';
+import '../../core/supabase/supabase-service.dart';
+import '../../screens/patient/invitations/data/invitation-repo.dart';
+import '../../screens/patient/invitations/presentation/cubit/invitation_cubit.dart';
+import '../../screens/patient/invitations/presentation/cubit/invitation_state.dart';
 import '../../theme/app_theme.dart';
 
-class FamilyProfileScreen extends StatelessWidget {
+class FamilyProfileScreen extends StatefulWidget {
   const FamilyProfileScreen({super.key});
+
+  @override
+  State<FamilyProfileScreen> createState() => _FamilyProfileScreenState();
+}
+
+class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
+  String? _currentInvitationLink;
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  String _buildInviteMessage(String name) {
+    final link = _currentInvitationLink ?? 'https://alzcare.app/invite';
+    return 'Hi ${name.isEmpty ? '' : name}, you have been invited to join as a patient. Join using this link: $link';
+  }
+
+  // WhatsApp invite
+  Future<void> _sendWhatsApp(String? phone, String message) async {
+    if (phone == null || phone.trim().isEmpty) {
+      _showSnack('Please provide a phone number');
+      return;
+    }
+    
+    // Extract digits only and ensure +2 prefix
+    String phoneNumber = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    
+    // If phone already has country code (starts with 2), use it, otherwise add +2
+    if (!phoneNumber.startsWith('2')) {
+      phoneNumber = '2$phoneNumber';
+    }
+    
+    if (phoneNumber.isEmpty || phoneNumber.length < 10) {
+      _showSnack('Please provide a valid phone number');
+      return;
+    }
+
+    final encoded = Uri.encodeComponent(message);
+    final nativeUri = Uri.parse('whatsapp://send?phone=$phoneNumber&text=$encoded');
+
+    if (await canLaunchUrl(nativeUri)) {
+      final ok = await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
+      if (!ok) {
+        final webUri = Uri.parse('https://wa.me/$phoneNumber?text=$encoded');
+        if (!await launchUrl(webUri, mode: LaunchMode.externalApplication)) {
+          _showSnack('Could not open WhatsApp');
+        }
+      }
+    } else {
+      final webUri = Uri.parse('https://wa.me/$phoneNumber?text=$encoded');
+      if (!await launchUrl(webUri, mode: LaunchMode.externalApplication)) {
+        _showSnack('Could not open WhatsApp');
+      }
+    }
+  }
+
+  // Send email
+  Future<void> _sendEmail(String? email, String subject, String body) async {
+    if (email == null || email.trim().isEmpty) {
+      _showSnack('Please provide an email address');
+      return;
+    }
+
+    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    if (!emailRegex.hasMatch(email.trim())) {
+      _showSnack('Please provide a valid email address');
+      return;
+    }
+
+    final encodedSubject = Uri.encodeComponent(subject);
+    final encodedBody = Uri.encodeComponent(body);
+    final mailtoUri = Uri.parse('mailto:$email?subject=$encodedSubject&body=$encodedBody');
+
+    if (await canLaunchUrl(mailtoUri)) {
+      await launchUrl(mailtoUri, mode: LaunchMode.externalApplication);
+    } else {
+      _showSnack('Could not open email client');
+    }
+  }
+
+  void _openInviteDialog() {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => BlocProvider(
+        create: (context) => InvitationCubit(
+          InvitationRepo(
+            InvitationService(),
+            PatientFamilyService(),
+            UserService(),
+          ),
+        ),
+        child: BlocListener<InvitationCubit, InvitationState>(
+          listener: (context, state) {
+            if (state is InvitationFailure) {
+              Navigator.pop(ctx);
+              showErrorDialog(
+                context: context,
+                error: state.errorMessage,
+                title: "Error",
+              );
+            } else if (state is InvitationSuccess) {
+              _currentInvitationLink =
+                  'https://alzcare.app/invite?code=${state.invitation.invitationCode}';
+              Navigator.pop(ctx);
+              _openInviteShareSheet(
+                name: nameCtrl.text.trim(),
+                phone: phoneCtrl.text.trim(),
+                email: emailCtrl.text.trim(),
+              );
+            }
+          },
+          child: BlocBuilder<InvitationCubit, InvitationState>(
+            builder: (context, state) {
+              return AlertDialog(
+                title: const Text('Invite a Patient'),
+                content: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextFormField(
+                          controller: nameCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Patient Name',
+                            prefixIcon: Icon(Icons.person),
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Name is required'
+                              : null,
+                        ),
+                        const SizedBox(height: 10),
+                        TextFormField(
+                          controller: phoneCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Phone (optional)',
+                            prefixIcon: Icon(Icons.phone),
+                            hintText: 'Enter phone number',
+                          ),
+                          keyboardType: TextInputType.phone,
+                          onChanged: (value) {
+                            // Remove any non-digit characters except what user types
+                            final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+                            if (digits.isNotEmpty && value != digits) {
+                              phoneCtrl.value = TextEditingValue(
+                                text: digits,
+                                selection: TextSelection.collapsed(offset: digits.length),
+                              );
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        TextFormField(
+                          controller: emailCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Email (optional)',
+                            prefixIcon: Icon(Icons.email),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (v) {
+                            if (v != null && v.trim().isNotEmpty) {
+                              final emailRegex = RegExp(
+                                  r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                              if (!emailRegex.hasMatch(v.trim())) {
+                                return 'Invalid email';
+                              }
+                            }
+                            return null;
+                          },
+                        ),
+                        if (phoneCtrl.text.trim().isEmpty &&
+                            emailCtrl.text.trim().isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              'Please provide either phone or email',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: state is InvitationLoading
+                        ? null
+                        : () {
+                            if (formKey.currentState!.validate()) {
+                              final phone = phoneCtrl.text.trim();
+                              final email = emailCtrl.text.trim();
+
+                              if (phone.isEmpty && email.isEmpty) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        'Please provide either phone or email'),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final familyUid = SharedPrefsHelper.getString("familyUid") ??
+                                  SharedPrefsHelper.getString("userId");
+                              if (familyUid == null) {
+                                Navigator.pop(ctx);
+                                showErrorDialog(
+                                  context: context,
+                                  error: "Family member ID not found",
+                                  title: "Error",
+                                );
+                                return;
+                              }
+
+                              // Add +2 prefix to phone number automatically
+                              String? finalPhone = phone.isNotEmpty 
+                                  ? (phone.startsWith('+2') ? phone : '+2$phone')
+                                  : null;
+                              
+                              context.read<InvitationCubit>().createInvitationFromFamily(
+                                    familyMemberId: familyUid,
+                                    patientEmail: email.isNotEmpty ? email : null,
+                                    patientPhone: finalPhone,
+                                  );
+                            }
+                          },
+                    icon: state is InvitationLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.arrow_forward),
+                    label: const Text('Continue'),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openInviteShareSheet({
+    required String name,
+    String? phone,
+    String? email,
+  }) {
+    final message = _buildInviteMessage(name);
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.sms),
+              title: const Text('Send via SMS'),
+              onTap: () {
+                Navigator.pop(context);
+                _showSnack('SMS feature coming soon');
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.chat, color: Colors.green.shade700),
+              title: const Text('WhatsApp'),
+              onTap: () {
+                Navigator.pop(context);
+                _sendWhatsApp(phone, message);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.email),
+              title: const Text('Send email'),
+              onTap: () {
+                Navigator.pop(context);
+                if (email != null && email.isNotEmpty) {
+                  _sendEmail(
+                    email,
+                    'Invitation to Join AlzCare',
+                    message,
+                  );
+                } else {
+                  _showSnack('Email address is required to send email');
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy),
+              title: const Text('Copy link'),
+              onTap: () {
+                Navigator.pop(context);
+                if (_currentInvitationLink != null) {
+                  Clipboard.setData(ClipboardData(text: _currentInvitationLink!));
+                  _showSnack('Link copied to clipboard');
+                } else {
+                  _showSnack('No invitation link available');
+                }
+              },
+            ),
+            const SizedBox(height: 6),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -280,81 +614,24 @@ class FamilyProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Settings
-            Card(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.teal50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.notifications,
-                        color: AppTheme.teal600,
-                      ),
-                    ),
-                    title: const Text('Notifications'),
-                    subtitle: const Text('Manage alert settings'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {},
+            // Invite Patient Button
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton.icon(
+                onPressed: _openInviteDialog,
+                icon: const Icon(Icons.person_add_alt_1),
+                label: const Text(
+                  'Invite Patient',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.teal600,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.cyan50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.shield,
-                        color: AppTheme.cyan600,
-                      ),
-                    ),
-                    title: const Text('Safe Zone Settings'),
-                    subtitle: const Text('Configure safe locations'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {},
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.teal50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.security,
-                        color: AppTheme.teal600,
-                      ),
-                    ),
-                    title: const Text('Privacy & Security'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {},
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.cyan50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.help,
-                        color: AppTheme.cyan600,
-                      ),
-                    ),
-                    title: const Text('Help & Support'),
-                    subtitle: const Text('Get caregiver assistance'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {},
-                  ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 16),

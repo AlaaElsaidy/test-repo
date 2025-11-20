@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
@@ -15,17 +17,109 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Injector.inject();
-  await SupabaseConfig.initialize();
-  await SharedPrefsHelper.init();
-  Stripe.publishableKey =
-      "pk_test_51SFtogRwYUVxFXZjh0dBu1dHGA2Gg3oXgZydNu5xgs26UNNJEsajZjAc8eAX2NLBtZLNTArMcuBUZL553AMJOO6c00V4sPebuf";
-  await Stripe.instance.applySettings();
+  
+  try {
+    await Injector.inject();
+  } catch (e) {
+    debugPrint('Error initializing Injector: $e');
+  }
+  
+  try {
+    await SupabaseConfig.initialize();
+  } catch (e) {
+    debugPrint('Error initializing Supabase: $e');
+  }
+  
+  try {
+    await SharedPrefsHelper.init();
+  } catch (e) {
+    debugPrint('Error initializing SharedPreferences: $e');
+  }
+  
+  try {
+    Stripe.publishableKey =
+        "pk_test_51SFtogRwYUVxFXZjh0dBu1dHGA2Gg3oXgZydNu5xgs26UNNJEsajZjAc8eAX2NLBtZLNTArMcuBUZL553AMJOO6c00V4sPebuf";
+    await Stripe.instance.applySettings();
+  } catch (e) {
+    debugPrint('Error initializing Stripe: $e');
+  }
+  
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  StreamSubscription? _linkSubscription;
+  late AppLinks _appLinks;
+
+  @override
+  void initState() {
+    super.initState();
+    _appLinks = AppLinks();
+    _handleInitialLink();
+    _handleIncomingLinks();
+  }
+
+  void _handleInitialLink() async {
+    // Handle link if app was opened from a link
+    try {
+      final initialLink = await _appLinks.getInitialLink();
+      if (initialLink != null) {
+        _processLink(initialLink);
+      }
+    } catch (e) {
+      debugPrint('Error getting initial link: $e');
+    }
+  }
+
+  void _handleIncomingLinks() {
+    // Handle links when app is already running
+    _linkSubscription = _appLinks.uriLinkStream.listen((Uri uri) {
+      _processLink(uri);
+    }, onError: (err) {
+      debugPrint('Error handling incoming link: $err');
+    });
+  }
+
+  void _processLink(Uri uri) {
+    // Extract invitation code from URL
+    // Supports: https://alzcare.app/invite?code=XXXXX
+    if (uri.host == 'alzcare.app' && uri.path == '/invite') {
+      final code = uri.queryParameters['code'];
+      if (code != null && code.isNotEmpty) {
+        // Navigate to invitation acceptance screen
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          navigatorKey.currentState?.pushNamed(
+            AppRoutes.invitationAcceptance,
+            arguments: code,
+          );
+        });
+      }
+    } else if (uri.scheme == 'alzcare') {
+      // Handle custom scheme: alzcare://invite?code=XXXXX
+      final code = uri.queryParameters['code'];
+      if (code != null && code.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          navigatorKey.currentState?.pushNamed(
+            AppRoutes.invitationAcceptance,
+            arguments: code,
+          );
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

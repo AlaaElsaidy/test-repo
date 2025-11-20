@@ -8,6 +8,7 @@ import '../../screens/family/family_main_screen.dart';
 import '../../screens/family/payment/presentation/pages/payment-screen.dart';
 import '../../screens/family/service/pages/service-screen.dart';
 import '../../screens/family/signup/presentation/pages/sign-up.dart';
+import '../../screens/patient/invitations/presentation/pages/invitation-acceptance-screen.dart';
 import '../../screens/patient/patient-details/presentation/pages/patient-details-screen.dart';
 import '../../screens/patient/patient_main_screen.dart';
 import '../../screens/role_selection_screen.dart';
@@ -47,6 +48,13 @@ class AppRouter {
       case AppRoutes.paymentDetails:
         return MaterialPageRoute(
             builder: (context) => const PaymentDetailsScreen());
+
+      case AppRoutes.invitationAcceptance:
+        final code = settings.arguments as String?;
+        return MaterialPageRoute(
+            builder: (context) => InvitationAcceptanceScreen(
+                  invitationCode: code,
+                ));
 
       default:
         return MaterialPageRoute(builder: (context) => const SizedBox());
