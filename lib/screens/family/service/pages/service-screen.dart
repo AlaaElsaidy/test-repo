@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../config/router/routes.dart';
 import '../../../../config/shared/widgets/custom-button.dart';
+import '../../../../config/shared/widgets/decore-circle.dart';
 import '../../../../config/utilis/app_colors.dart';
 import '../../../../gen/assets.gen.dart';
 import '../widgets/service-item.dart';
@@ -15,7 +16,7 @@ class ServiceScreen extends StatefulWidget {
 }
 
 class _ServiceScreenState extends State<ServiceScreen> {
-  final int price = 150; // باكدج كاملة: Doctor + Mentor (سعر ثابت)
+  final int price = 150;
 
   @override
   Widget build(BuildContext context) {
@@ -25,16 +26,15 @@ class _ServiceScreenState extends State<ServiceScreen> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // دوائر ديكورية خفيفة زي باقي الشاشات
           Positioned(
             top: -width * 0.25,
             left: -width * 0.15,
-            child: _decorCircle(size: width * 0.7),
+            child: DecorCircle(size: width * 0.7),
           ),
           Positioned(
             bottom: -width * 0.30,
             right: -width * 0.20,
-            child: _decorCircle(size: width * 0.9),
+            child: DecorCircle(size: width * 0.9),
           ),
 
           SafeArea(
@@ -63,7 +63,6 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   ),
                   SizedBox(height: context.h(24)),
 
-                  // كارد الباكدج الوحيدة
                   ServiceItem(
                     title: "Full Package",
                     price: "$price\$",
@@ -78,7 +77,6 @@ class _ServiceScreenState extends State<ServiceScreen> {
 
                   SizedBox(height: context.h(28)),
 
-                  // السعر النهائي
                   Container(
                     padding: EdgeInsets.symmetric(
                       horizontal: context.w(16),
@@ -123,7 +121,6 @@ class _ServiceScreenState extends State<ServiceScreen> {
 
                   SizedBox(height: context.h(20)),
 
-                  // زر التالي
                   SizedBox(
                     width: double.infinity,
                     child: CustomButton(
@@ -142,28 +139,4 @@ class _ServiceScreenState extends State<ServiceScreen> {
     );
   }
 
-  Widget _decorCircle({required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primaryColor.withOpacity(0.20),
-            const Color(0xFF06B6D4).withOpacity(0.20),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryColor.withOpacity(0.10),
-            blurRadius: 40,
-            spreadRadius: 8,
-          ),
-        ],
-      ),
-    );
-  }
 }

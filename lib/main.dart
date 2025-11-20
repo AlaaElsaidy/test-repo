@@ -20,7 +20,7 @@ void main() async {
   await SharedPrefsHelper.init();
   Stripe.publishableKey =
       "pk_test_51SFtogRwYUVxFXZjh0dBu1dHGA2Gg3oXgZydNu5xgs26UNNJEsajZjAc8eAX2NLBtZLNTArMcuBUZL553AMJOO6c00V4sPebuf";
-
+  await Stripe.instance.applySettings();
   runApp(const MyApp());
 }
 

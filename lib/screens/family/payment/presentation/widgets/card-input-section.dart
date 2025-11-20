@@ -17,7 +17,7 @@ class CardInputSection extends StatelessWidget {
       required this.saveCard});
 
   TextEditingController nameController;
-  CardFormEditController? cardFormEditController;
+  CardFormEditController cardFormEditController;
   Function onCardChange;
   Function onChange;
   bool saveCard;
@@ -71,7 +71,7 @@ class CardInputSection extends StatelessWidget {
               controller: cardFormEditController,
               enablePostalCode: true,
               onCardChanged: (details) {
-                onChange(details);
+                onCardChange(details);
               },
               style: CardFormStyle(
                 textColor: const Color(0xFF163E39),

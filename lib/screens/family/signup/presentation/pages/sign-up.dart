@@ -86,8 +86,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         title: "Register Failed");
                   }
                   if (state is AddFamilySuccess) {
-                    Navigator.pushReplacementNamed(
-                        context, AppRoutes.doctorSelection);
+                    Navigator.pushReplacementNamed(context, AppRoutes.service);
                   }
                   if (state is AddFamilyFailure) {
                     showErrorDialog(
