@@ -226,8 +226,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                         child: CustomTextForm(
                                           textEditingController:
                                               _passwordController,
-                                          validator: (v) =>
-                                              passwordValidator(v),
+                                          // No validation on login password for now
+                                          validator: (_) => null,
                                           hintText: "••••••••",
                                           textInputType: TextInputType.text,
                                           secure: true,
