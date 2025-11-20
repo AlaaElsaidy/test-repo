@@ -12,12 +12,50 @@ class PatientFamilyService {
   }) async {
     final now = DateTime.now();
 
+    // If relation already exists, just return it
+    final alreadyExists = await relationExists(
+      patientId: patientId,
+      familyMemberId: familyMemberId,
+    );
+
+    if (alreadyExists) {
+      final existing = await _client
+          .from('patient_family_relations')
+          .select()
+          .eq('patient_id', patientId)
+          .eq('family_member_id', familyMemberId)
+          .single();
+
+      // Try to back-fill family_members.patient_id
+      try {
+        await _client
+            .from('family_members')
+            .update({'patient_id': patientId})
+            .eq('id', familyMemberId);
+      } catch (_) {
+        // Ignore any FK/constraint errors – relation itself already exists
+      }
+
+      return PatientFamilyRelationModel.fromJson(existing);
+    }
+
+    // Insert new relation
     final response = await _client.from('patient_family_relations').insert({
       'patient_id': patientId,
       'family_member_id': familyMemberId,
       if (relationType != null) 'relation_type': relationType,
       'created_at': now.toIso8601String(),
     }).select().single();
+
+    // After creating relation, try to set family_members.patient_id as well
+    try {
+      await _client
+          .from('family_members')
+          .update({'patient_id': patientId})
+          .eq('id', familyMemberId);
+    } catch (_) {
+      // Ignore errors here – core relation is stored in patient_family_relations
+    }
 
     return PatientFamilyRelationModel.fromJson(response);
   }

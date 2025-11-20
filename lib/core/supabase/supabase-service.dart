@@ -60,6 +60,13 @@ class PatientService {
     double? longitude,
     String? photoUrl,
   }) async {
+    // Check if patient record already exists
+    final existing = await getPatientByUserId(patientId);
+    if (existing != null) {
+      // Patient record already exists, don't insert again
+      return;
+    }
+    
     await _client.from('patients').insert({
       'user_id': patientId,
       'age': age,

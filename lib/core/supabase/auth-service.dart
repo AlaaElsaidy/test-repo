@@ -57,4 +57,50 @@ class AuthService {
   Stream<AuthState> authStateStream() {
     return _client.auth.onAuthStateChange;
   }
+
+  /// Create patient account with default password (123456)
+  /// Used when family member invites a patient
+  /// If email already exists in auth, throws exception
+  Future<AuthResponse> createPatientAccountWithDefaultPassword({
+    required String email,
+    required String name,
+    String? phone,
+  }) async {
+    const defaultPassword = '123456';
+    
+    try {
+      final response = await _client.auth.signUp(
+        email: email,
+        password: defaultPassword,
+      );
+
+      if (response.user != null) {
+        // Use upsert to avoid unique constraint violations
+        await _client.from('users').upsert({
+          'id': response.user!.id,
+          'email': email,
+          'name': name,
+          'role': 'patient',
+          if (phone != null) 'phone': phone,
+        }, onConflict: 'id');
+      }
+
+      return response;
+    } catch (e) {
+      // If signup fails due to email already existing, check if user exists in users table
+      final existingUser = await _client
+          .from('users')
+          .select()
+          .eq('email', email)
+          .maybeSingle();
+      
+      if (existingUser != null) {
+        // User exists in users table, throw exception to be handled by caller
+        throw Exception('User already exists in system');
+      }
+      
+      // Re-throw original error
+      rethrow;
+    }
+  }
 }

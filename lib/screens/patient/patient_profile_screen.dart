@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:alzcare/config/shared/widgets/error-dialoge.dart';
 import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
+import 'package:alzcare/core/supabase/auth-service.dart';
 import 'package:alzcare/core/supabase/invitation-service.dart';
 import 'package:alzcare/core/supabase/patient-family-service.dart';
 import 'package:alzcare/core/supabase/supabase-service.dart';
@@ -304,6 +305,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             InvitationService(),
             PatientFamilyService(),
             UserService(),
+            AuthService(),
+            PatientService(),
           ),
         ),
         child: BlocListener<InvitationCubit, InvitationState>(
@@ -888,13 +891,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                 ),
 
                 const SizedBox(height: 16),
-
-                // NOTE: The following tabs were removed per user request:
-                // - Notifications
-                // - Safe Zone Settings
-                // - Privacy & Security
-                // - Help & Support
-                // These tabs should NOT be added back to the patient profile screen.
 
                 // Invite Relative Button
                 SizedBox(

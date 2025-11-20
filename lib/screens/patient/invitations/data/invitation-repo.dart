@@ -1,6 +1,8 @@
 import 'package:alzcare/core/models/invitation-model.dart';
+import 'package:alzcare/core/supabase/auth-service.dart';
 import 'package:alzcare/core/supabase/invitation-service.dart';
 import 'package:alzcare/core/supabase/patient-family-service.dart';
+import 'package:alzcare/core/supabase/supabase-config.dart';
 import 'package:alzcare/core/supabase/supabase-error-handler.dart';
 import 'package:alzcare/core/supabase/supabase-service.dart';
 import 'package:dartz/dartz.dart';
@@ -9,11 +11,15 @@ class InvitationRepo {
   final InvitationService _invitationService;
   final PatientFamilyService _patientFamilyService;
   final UserService _userService;
+  final AuthService _authService;
+  final PatientService _patientService;
 
   InvitationRepo(
     this._invitationService,
     this._patientFamilyService,
     this._userService,
+    this._authService,
+    this._patientService,
   );
 
   /// Create invitation (Patient to Family)
@@ -35,17 +41,181 @@ class InvitationRepo {
   }
 
   /// Create invitation from Family to Patient
+  /// Automatically creates patient account if email doesn't exist
+  /// Links patient to family immediately
   Future<Either<String, InvitationModel>> createInvitationFromFamily({
     required String familyMemberId,
-    String? patientEmail,
+    required String patientEmail,
     String? patientPhone,
+    required String patientName,
   }) async {
     try {
+      // Check if patient exists by email
+      String? patientUserId;
+      String? patientRecordId;
+      final existingUser = await _userService.getUserByEmail(patientEmail);
+      
+      if (existingUser != null) {
+        // Patient exists, use their ID
+        if (existingUser['role'] == 'patient') {
+          patientUserId = existingUser['id'] as String;
+          // Get patient record ID from patients table
+          final patientRecord = await _patientService.getPatientByUserId(patientUserId);
+          if (patientRecord != null) {
+            patientRecordId = patientRecord['id'] as String?;
+          } else {
+            // User exists but no patient record, create it
+            await _patientService.addPatient(
+              patientId: patientUserId,
+              age: 0,
+              name: patientName,
+              gender: 'Male', // Use 'Male' or 'Female' as per the dropdown
+            );
+            final newPatientRecord = await _patientService.getPatientByUserId(patientUserId);
+            patientRecordId = newPatientRecord?['id'] as String?;
+          }
+        } else {
+          return const Left('Email is already registered with a different role');
+        }
+      } else {
+        // Patient doesn't exist, create new account
+        try {
+          final authResponse = await _authService.createPatientAccountWithDefaultPassword(
+            email: patientEmail,
+            name: patientName,
+            phone: patientPhone,
+          );
+
+          if (authResponse.user == null) {
+            return const Left('Failed to create patient account');
+          }
+
+          patientUserId = authResponse.user!.id;
+
+          // Create patient record with minimal data (addPatient checks if exists)
+          // Note: gender must be 'Male' or 'Female' (capitalized) as per the dropdown
+          await _patientService.addPatient(
+            patientId: patientUserId,
+            age: 0, // Will be updated later
+            name: patientName,
+            gender: 'Male', // Default value, will be updated later
+          );
+          
+          // Get the patient record ID
+          final patientRecord = await _patientService.getPatientByUserId(patientUserId);
+          patientRecordId = patientRecord?['id'] as String?;
+        } catch (e) {
+          // If account creation fails (e.g., email already exists in auth)
+          // Check if user exists in users table by email
+          final userByEmail = await _userService.getUserByEmail(patientEmail);
+          if (userByEmail != null) {
+            // User exists, use their ID
+            patientUserId = userByEmail['id'] as String;
+            final patientRecord = await _patientService.getPatientByUserId(patientUserId);
+            if (patientRecord != null) {
+              patientRecordId = patientRecord['id'] as String?;
+            } else {
+              // Create patient record (addPatient checks if exists)
+              await _patientService.addPatient(
+                patientId: patientUserId,
+                age: 0,
+                name: patientName,
+                gender: 'Male',
+              );
+              final newPatientRecord = await _patientService.getPatientByUserId(patientUserId);
+              patientRecordId = newPatientRecord?['id'] as String?;
+            }
+          } else {
+            // Email exists in auth but not in users table - this is a problem
+            return Left('Email is already registered in the system but account setup is incomplete. Please contact support or try a different email.');
+          }
+        }
+      }
+
+      if (patientRecordId == null) {
+        return const Left('Failed to get patient record ID');
+      }
+
+      // Create invitation (initially without patient_id to avoid FK issues).
+      // Afterwards we will try to back-fill invitations.patient_id safely.
       final invitation = await _invitationService.createInvitationFromFamily(
         familyMemberId: familyMemberId,
         patientEmail: patientEmail,
         patientPhone: patientPhone,
       );
+
+      // Try to set invitations.patient_id with the patient record id.
+      // If there is a foreign key mismatch or any DB constraint, we ignore
+      // the error and keep the invitation (linking is still handled via
+      // patient_family_relations and email/phone).
+      final invitationId = invitation.id;
+      if (invitationId != null) {
+        final idForInvitation = patientRecordId ?? patientUserId;
+        if (idForInvitation != null) {
+          try {
+            await SupabaseConfig.client
+                .from('invitations')
+                .update({'patient_id': idForInvitation})
+                .eq('id', invitationId);
+          } catch (e) {
+            // Log a warning but don't fail the flow
+            final msg = SupabaseErrorHandler.handleError(e);
+            // ignore: avoid_print
+            print('Warning: failed to update invitations.patient_id: $msg');
+          }
+        }
+      }
+
+      // Link patient to family immediately
+      // Note: patientId used here is the patient record id when available.
+      String? linkingError;
+      
+      // Try with patient record ID first (most likely correct)
+      try {
+        final relationExists = await _patientFamilyService.relationExists(
+          patientId: patientRecordId,
+          familyMemberId: familyMemberId,
+        );
+
+        if (!relationExists) {
+          await _patientFamilyService.linkPatientToFamily(
+            patientId: patientRecordId,
+            familyMemberId: familyMemberId,
+          );
+        }
+        linkingError = null; // Success
+      } catch (e) {
+        linkingError = SupabaseErrorHandler.handleError(e);
+        // If linking with patient record ID fails, try with user ID
+        // This handles cases where patient_id refers to user_id instead of patients.id
+        try {
+          final relationExists = await _patientFamilyService.relationExists(
+            patientId: patientUserId,
+            familyMemberId: familyMemberId,
+          );
+
+          if (!relationExists) {
+            await _patientFamilyService.linkPatientToFamily(
+              patientId: patientUserId,
+              familyMemberId: familyMemberId,
+            );
+          }
+          linkingError = null; // Success with user ID
+        } catch (e2) {
+          // If both fail, log the error but don't fail the invitation creation
+          // The invitation is already created, linking can be done later
+          linkingError = 'Warning: Failed to link patient to family automatically. ${SupabaseErrorHandler.handleError(e2)}';
+          // Don't return error here - invitation is created successfully
+          // The relation can be established when patient accepts the invitation
+        }
+      }
+      
+      // If linking failed, log it but don't fail the invitation
+      if (linkingError != null) {
+        print('Warning: $linkingError');
+        // Invitation is still created successfully
+      }
+
       return Right(invitation);
     } catch (e) {
       return Left(SupabaseErrorHandler.handleError(e));

@@ -28,14 +28,16 @@ class InvitationCubit extends Cubit<InvitationState> {
 
   Future<void> createInvitationFromFamily({
     required String familyMemberId,
-    String? patientEmail,
+    required String patientEmail,
     String? patientPhone,
+    required String patientName,
   }) async {
     emit(InvitationLoading());
     final result = await invitationRepo.createInvitationFromFamily(
       familyMemberId: familyMemberId,
       patientEmail: patientEmail,
       patientPhone: patientPhone,
+      patientName: patientName,
     );
 
     result.fold(

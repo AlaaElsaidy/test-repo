@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/shared/widgets/error-dialoge.dart';
 import '../../core/shared-prefrences/shared-prefrences-helper.dart';
+import '../../core/supabase/auth-service.dart';
 import '../../core/supabase/invitation-service.dart';
 import '../../core/supabase/patient-family-service.dart';
 import '../../core/supabase/supabase-service.dart';
@@ -109,6 +110,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             InvitationService(),
             PatientFamilyService(),
             UserService(),
+            AuthService(),
+            PatientService(),
           ),
         ),
         child: BlocListener<InvitationCubit, InvitationState>(
@@ -175,33 +178,22 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                         TextFormField(
                           controller: emailCtrl,
                           decoration: const InputDecoration(
-                            labelText: 'Email (optional)',
+                            labelText: 'Email *',
                             prefixIcon: Icon(Icons.email),
                           ),
                           keyboardType: TextInputType.emailAddress,
                           validator: (v) {
-                            if (v != null && v.trim().isNotEmpty) {
-                              final emailRegex = RegExp(
-                                  r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-                              if (!emailRegex.hasMatch(v.trim())) {
-                                return 'Invalid email';
-                              }
+                            if (v == null || v.trim().isEmpty) {
+                              return 'Email is required';
+                            }
+                            final emailRegex = RegExp(
+                                r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                            if (!emailRegex.hasMatch(v.trim())) {
+                              return 'Invalid email';
                             }
                             return null;
                           },
                         ),
-                        if (phoneCtrl.text.trim().isEmpty &&
-                            emailCtrl.text.trim().isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              'Please provide either phone or email',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ),
@@ -218,12 +210,12 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                             if (formKey.currentState!.validate()) {
                               final phone = phoneCtrl.text.trim();
                               final email = emailCtrl.text.trim();
+                              final name = nameCtrl.text.trim();
 
-                              if (phone.isEmpty && email.isEmpty) {
+                              if (email.isEmpty) {
                                 ScaffoldMessenger.of(ctx).showSnackBar(
                                   const SnackBar(
-                                    content: Text(
-                                        'Please provide either phone or email'),
+                                    content: Text('Email is required'),
                                   ),
                                 );
                                 return;
@@ -248,8 +240,9 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                               
                               context.read<InvitationCubit>().createInvitationFromFamily(
                                     familyMemberId: familyUid,
-                                    patientEmail: email.isNotEmpty ? email : null,
+                                    patientEmail: email,
                                     patientPhone: finalPhone,
+                                    patientName: name,
                                   );
                             }
                           },

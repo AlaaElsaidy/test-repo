@@ -1,7 +1,10 @@
+import 'package:alzcare/config/router/routes.dart';
 import 'package:alzcare/config/screen_sizer/size_extension.dart';
 import 'package:alzcare/config/shared/widgets/error-dialoge.dart';
 import 'package:alzcare/config/shared/widgets/loading.dart';
+import 'package:alzcare/config/shared/widgets/custom-button.dart';
 import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
+import 'package:alzcare/core/supabase/auth-service.dart';
 import 'package:alzcare/core/supabase/invitation-service.dart';
 import 'package:alzcare/core/supabase/patient-family-service.dart';
 import 'package:alzcare/core/supabase/supabase-service.dart';
@@ -10,12 +13,7 @@ import 'package:alzcare/screens/patient/invitations/presentation/cubit/invitatio
 import 'package:alzcare/screens/patient/invitations/presentation/cubit/invitation_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import '../../../../../config/router/routes.dart';
-import '../../../../../config/shared/widgets/custom-button.dart';
-import '../../../../../config/shared/widgets/custom-text-form.dart';
-import '../../../../../config/shared/widgets/field-wrapper.dart';
-import '../../../../../config/utilis/app_colors.dart';
+import 'package:alzcare/config/utilis/app_colors.dart';
 
 class InvitationAcceptanceScreen extends StatefulWidget {
   final String? invitationCode;
@@ -26,12 +24,10 @@ class InvitationAcceptanceScreen extends StatefulWidget {
   });
 
   @override
-  State<InvitationAcceptanceScreen> createState() =>
-      _InvitationAcceptanceScreenState();
+  State<InvitationAcceptanceScreen> createState() => _InvitationAcceptanceScreenState();
 }
 
-class _InvitationAcceptanceScreenState
-    extends State<InvitationAcceptanceScreen> {
+class _InvitationAcceptanceScreenState extends State<InvitationAcceptanceScreen> {
   final _codeController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
@@ -40,10 +36,6 @@ class _InvitationAcceptanceScreenState
     super.initState();
     if (widget.invitationCode != null) {
       _codeController.text = widget.invitationCode!;
-      // Auto-load invitation if code provided
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.read<InvitationCubit>().getInvitationByCode(widget.invitationCode!);
-      });
     }
   }
 
@@ -61,6 +53,8 @@ class _InvitationAcceptanceScreenState
           InvitationService(),
           PatientFamilyService(),
           UserService(),
+          AuthService(),
+          PatientService(),
         ),
       ),
       child: Scaffold(
@@ -124,93 +118,39 @@ class _InvitationAcceptanceScreenState
                       Text(
                         'Enter Invitation Code',
                         style: TextStyle(
-                          color: const Color(0xFF0E3E3B),
-                          fontWeight: FontWeight.w700,
                           fontSize: context.sp(24),
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF0E3E3B),
                         ),
                       ),
                       SizedBox(height: context.h(8)),
                       Text(
-                        'Enter the invitation code you received to link with a family member',
+                        'Please enter the invitation code you received',
                         style: TextStyle(
-                          color: const Color(0xFF7EA9A3),
                           fontSize: context.sp(14),
+                          color: Colors.grey[600],
                         ),
                       ),
-                      SizedBox(height: context.h(40)),
-                      FieldWrapper(
-                        icon: Icons.vpn_key_outlined,
-                        child: CustomTextForm(
-                          textEditingController: _codeController,
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Invitation code is required';
-                            }
-                            if (v.trim().length < 6) {
-                              return 'Invalid invitation code';
-                            }
-                            return null;
-                          },
-                          hintText: "Enter invitation code",
-                          textInputType: TextInputType.text,
-                        ),
-                      ),
-                      SizedBox(height: context.h(24)),
-                      if (state is InvitationSuccess) ...[
-                        Container(
-                          padding: EdgeInsets.all(context.w(16)),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryColor.withOpacity(0.1),
+                      SizedBox(height: context.h(32)),
+                      TextFormField(
+                        controller: _codeController,
+                        decoration: InputDecoration(
+                          labelText: 'Invitation Code',
+                          hintText: 'Enter code',
+                          prefixIcon: const Icon(Icons.vpn_key),
+                          border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: AppColors.primaryColor.withOpacity(0.3),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    color: AppColors.primaryColor,
-                                    size: 20,
-                                  ),
-                                  SizedBox(width: context.w(8)),
-                                  Text(
-                                    'Invitation Found',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: context.sp(16),
-                                      color: AppColors.primaryColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: context.h(12)),
-                              Text(
-                                'Status: ${state.invitation.status}',
-                                style: TextStyle(
-                                  fontSize: context.sp(14),
-                                  color: const Color(0xFF2E5753),
-                                ),
-                              ),
-                              if (state.invitation.isExpired)
-                                Padding(
-                                  padding: EdgeInsets.only(top: context.h(8)),
-                                  child: Text(
-                                    'This invitation has expired',
-                                    style: TextStyle(
-                                      fontSize: context.sp(12),
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                ),
-                            ],
                           ),
                         ),
-                        SizedBox(height: context.h(24)),
-                      ],
+                        textCapitalization: TextCapitalization.characters,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Please enter invitation code';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: context.h(32)),
                       SizedBox(
                         width: double.infinity,
                         child: CustomButton(
@@ -281,4 +221,3 @@ class _InvitationAcceptanceScreenState
     );
   }
 }
-

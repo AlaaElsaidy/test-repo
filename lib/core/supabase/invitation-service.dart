@@ -54,14 +54,15 @@ class InvitationService {
   }
 
   /// Create invitation from Family to Patient
+  /// Note: patientEmail is required. For family_to_patient invitations we
+  /// keep patient_id nullable to avoid foreign key issues and rely on
+  /// email/phone + separate relations for linking.
   Future<InvitationModel> createInvitationFromFamily({
     required String familyMemberId,
-    String? patientEmail,
+    required String patientEmail,
     String? patientPhone,
+    String? patientId, // Kept for backward compatibility but not used in insert
   }) async {
-    if (patientEmail == null && patientPhone == null) {
-      throw Exception('Either patient email or phone must be provided');
-    }
 
     String invitationCode = '';
     bool isUnique = false;
@@ -82,8 +83,11 @@ class InvitationService {
 
     final response = await _client.from('invitations').insert({
       'family_member_id': familyMemberId,
-      if (patientEmail != null) 'patient_email': patientEmail,
+      'patient_email': patientEmail,
       if (patientPhone != null) 'patient_phone': patientPhone,
+      // Do NOT set patient_id here for family_to_patient invitations.
+      // The foreign key on invitations.patient_id points to an existing
+      // table and using a user id here can cause 23503 errors.
       'invitation_type': 'family_to_patient',
       'invitation_code': invitationCode,
       'status': 'pending',
