@@ -32,6 +32,13 @@ class _SignInScreenState extends State<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
 
   bool _rememberMe = false;
+  String? _selectedRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedRole = SharedPrefsHelper.getString('selectedRole');
+  }
 
   @override
   void dispose() {
@@ -322,6 +329,19 @@ class _SignInScreenState extends State<SignInScreen> {
                             SizedBox(height: context.h(16)),
                             buildSignUpLink(context),
                             SizedBox(height: context.h(8)),
+                            if (_selectedRole == 'patient') ...[
+                              TextButton.icon(
+                                onPressed: () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    AppRoutes.invitationAcceptance,
+                                  );
+                                },
+                                icon: const Icon(Icons.vpn_key),
+                                label: const Text('Have an invitation code?'),
+                              ),
+                              SizedBox(height: context.h(8)),
+                            ],
                           ],
                         ),
                         if (state is GetUserLoading || state is LoginLoading?)

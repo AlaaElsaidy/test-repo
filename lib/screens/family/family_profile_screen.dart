@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/shared/widgets/error-dialoge.dart';
+import '../../core/models/invitation-model.dart';
 import '../../core/shared-prefrences/shared-prefrences-helper.dart';
 import '../../core/supabase/auth-service.dart';
 import '../../core/supabase/invitation-service.dart';
@@ -22,15 +23,69 @@ class FamilyProfileScreen extends StatefulWidget {
 }
 
 class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
+  String? _currentInvitationCode;
   String? _currentInvitationLink;
+  late final InvitationCubit _invitationsCubit;
+  List<InvitationModel> _sentInvitations = [];
+  bool _isFetchingInvites = false;
+  String? _invitesError;
+
+  @override
+  void initState() {
+    super.initState();
+    _invitationsCubit = InvitationCubit(
+      InvitationRepo(
+        InvitationService(),
+        PatientFamilyService(),
+        UserService(),
+        AuthService(),
+        PatientService(),
+      ),
+    );
+    _loadInvitations();
+  }
+
+  @override
+  void dispose() {
+    _invitationsCubit.close();
+    super.dispose();
+  }
 
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   String _buildInviteMessage(String name) {
-    final link = _currentInvitationLink ?? 'https://alzcare.app/invite';
-    return 'Hi ${name.isEmpty ? '' : name}, you have been invited to join as a patient. Join using this link: $link';
+    final code = _currentInvitationCode ?? '';
+    final deepLink =
+        _currentInvitationLink ?? (code.isNotEmpty ? 'alzcare://invite?code=$code' : 'alzcare://invite');
+
+    final friendlyName = name.isEmpty ? '' : '$name, ';
+
+    return 'Hi ${friendlyName}you have been invited to join as a patient.\n'
+        'Invitation code: $code\n'
+        'Tap this link after installing the app: $deepLink\n'
+        'If the link does not open the app, open AlzCare manually, go to “Accept Invitation”, and enter the code above.';
+  }
+
+  Future<void> _loadInvitations() async {
+    final familyUid =
+        SharedPrefsHelper.getString("familyUid") ?? SharedPrefsHelper.getString("userId");
+
+    if (familyUid == null) {
+      setState(() {
+        _invitesError = "Family member ID not found";
+        _isFetchingInvites = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isFetchingInvites = true;
+      _invitesError = null;
+    });
+
+    await _invitationsCubit.getInvitationsByFamilyMember(familyUid);
   }
 
   // WhatsApp invite
@@ -124,14 +179,16 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                 title: "Error",
               );
             } else if (state is InvitationSuccess) {
+              _currentInvitationCode = state.invitation.invitationCode;
               _currentInvitationLink =
-                  'https://alzcare.app/invite?code=${state.invitation.invitationCode}';
+                  'alzcare://invite?code=${state.invitation.invitationCode}';
               Navigator.pop(ctx);
               _openInviteShareSheet(
                 name: nameCtrl.text.trim(),
                 phone: phoneCtrl.text.trim(),
                 email: emailCtrl.text.trim(),
               );
+              _loadInvitations();
             }
           },
           child: BlocBuilder<InvitationCubit, InvitationState>(
@@ -317,12 +374,51 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
               title: const Text('Copy link'),
               onTap: () {
                 Navigator.pop(context);
-                if (_currentInvitationLink != null) {
-                  Clipboard.setData(ClipboardData(text: _currentInvitationLink!));
-                  _showSnack('Link copied to clipboard');
-                } else {
-                  _showSnack('No invitation link available');
+                final code = _currentInvitationCode;
+                final link = _currentInvitationLink;
+
+                if (code == null || code.isEmpty || link == null) {
+                  _showSnack('No invitation data available');
+                  return;
                 }
+
+                Clipboard.setData(
+                  ClipboardData(
+                    text:
+                        'Invitation code: $code\nOpen after installing the app: $link',
+                  ),
+                );
+                _showSnack('Invitation info copied');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.key),
+              title: const Text('Copy code only'),
+              onTap: () {
+                Navigator.pop(context);
+                if (_currentInvitationCode == null ||
+                    _currentInvitationCode!.isEmpty) {
+                  _showSnack('No invitation code available');
+                  return;
+                }
+                Clipboard.setData(
+                  ClipboardData(text: _currentInvitationCode!),
+                );
+                _showSnack('Code copied');
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.chat_bubble_outline, color: Colors.green.shade700),
+              title: const Text('Send code via WhatsApp'),
+              onTap: () {
+                Navigator.pop(context);
+                if (_currentInvitationCode == null ||
+                    _currentInvitationCode!.isEmpty) {
+                  _showSnack('No invitation code available');
+                  return;
+                }
+                final codeMessage = 'Invitation code: ${_currentInvitationCode!}';
+                _sendWhatsApp(phone, codeMessage);
               },
             ),
             const SizedBox(height: 6),
@@ -332,15 +428,184 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+  Widget _buildInvitationsCard() {
+    Widget content;
+
+    if (_isFetchingInvites) {
+      content = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    } else if (_invitesError != null) {
+      content = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _invitesError!,
+              style: const TextStyle(color: Colors.red),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _loadInvitations,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    } else if (_sentInvitations.isEmpty) {
+      content = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'No invitations sent yet.',
+              style: TextStyle(color: AppTheme.gray600),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _openInviteDialog,
+              icon: const Icon(Icons.person_add),
+              label: const Text('Invite a patient'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      content = Column(
+        children: List.generate(_sentInvitations.length, (index) {
+          final invite = _sentInvitations[index];
+          final initials = _codeInitials(invite.invitationCode);
+          final statusColor = _statusColor(invite.status);
+
+          return Column(
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.teal50,
+                  child: Text(
+                    initials,
+                    style: const TextStyle(
+                      color: AppTheme.teal600,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                title: Text(invite.patientEmail ?? invite.patientPhone ?? 'Patient'),
+                subtitle: Text('Code: ${invite.invitationCode}'),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        invite.status.toUpperCase(),
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${invite.createdAt.toLocal().toString().split(' ').first}',
+                      style: const TextStyle(fontSize: 10, color: AppTheme.gray500),
+                    ),
+                  ],
+                ),
+              ),
+              if (index != _sentInvitations.length - 1)
+                const Divider(height: 24, thickness: 0.5),
+            ],
+          );
+        }),
+      );
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // Profile Header
-            Container(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Pending Invitations',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.teal900,
+                  ),
+                ),
+                IconButton(
+                  onPressed: _loadInvitations,
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Refresh',
+                )
+              ],
+            ),
+            const SizedBox(height: 12),
+            content,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      case 'expired':
+        return Colors.orange;
+      default:
+        return AppTheme.teal600;
+    }
+  }
+
+  String _codeInitials(String code) {
+    if (code.isEmpty) return '--';
+    return code.length <= 2 ? code : code.substring(0, 2);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider.value(
+      value: _invitationsCubit,
+      child: BlocListener<InvitationCubit, InvitationState>(
+        listener: (context, state) {
+          if (state is InvitationsListSuccess) {
+            setState(() {
+              _sentInvitations = state.invitations;
+              _isFetchingInvites = false;
+              _invitesError = null;
+            });
+          } else if (state is InvitationFailure && _isFetchingInvites) {
+            setState(() {
+              _invitesError = state.errorMessage;
+              _isFetchingInvites = false;
+            });
+          }
+        },
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Profile Header
+                Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: AppTheme.tealGradient,
@@ -548,6 +813,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            _buildInvitationsCard(),
+            const SizedBox(height: 16),
 
             // Doctor Contact Card
             Card(
@@ -652,7 +919,9 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:alzcare/config/router/routes.dart';
+import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -37,7 +38,7 @@ class RoleSelectionScreen extends StatelessWidget {
 
                   // Title
                   const Text(
-                    'AlzCare',
+                    'Memora',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
@@ -87,6 +88,7 @@ class RoleSelectionScreen extends StatelessWidget {
                           icon: Icons.person,
                           label: 'Patient Portal',
                           onPressed: () {
+                            SharedPrefsHelper.saveString('selectedRole', 'patient');
                             Navigator.pushNamed(context, AppRoutes.login);
                           },
                         ),
@@ -97,6 +99,7 @@ class RoleSelectionScreen extends StatelessWidget {
                           icon: Icons.medical_services,
                           label: 'Doctor Portal',
                           onPressed: () {
+                            SharedPrefsHelper.saveString('selectedRole', 'doctor');
                             Navigator.pushNamed(context, AppRoutes.login);
                           },
                         ),
@@ -107,6 +110,7 @@ class RoleSelectionScreen extends StatelessWidget {
                           icon: Icons.family_restroom,
                           label: 'Family Member Portal',
                           onPressed: () {
+                            SharedPrefsHelper.saveString('selectedRole', 'family');
                             Navigator.pushNamed(context, AppRoutes.login);
                           },
                         ),

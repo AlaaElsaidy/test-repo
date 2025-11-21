@@ -151,18 +151,16 @@ class InvitationRepo {
       final invitationId = invitation.id;
       if (invitationId != null) {
         final idForInvitation = patientRecordId ?? patientUserId;
-        if (idForInvitation != null) {
-          try {
-            await SupabaseConfig.client
-                .from('invitations')
-                .update({'patient_id': idForInvitation})
-                .eq('id', invitationId);
-          } catch (e) {
-            // Log a warning but don't fail the flow
-            final msg = SupabaseErrorHandler.handleError(e);
-            // ignore: avoid_print
-            print('Warning: failed to update invitations.patient_id: $msg');
-          }
+        try {
+          await SupabaseConfig.client
+              .from('invitations')
+              .update({'patient_id': idForInvitation})
+              .eq('id', invitationId);
+        } catch (e) {
+          // Log a warning but don't fail the flow
+          final msg = SupabaseErrorHandler.handleError(e);
+          // ignore: avoid_print
+          print('Warning: failed to update invitations.patient_id: $msg');
         }
       }
 
@@ -237,7 +235,7 @@ class InvitationRepo {
   /// Supports both Patient-to-Family and Family-to-Patient invitations
   Future<Either<String, void>> acceptInvitation({
     required String invitationCode,
-    required String patientId,
+    required String patientId, // This is user_id, need to convert to patient record ID
   }) async {
     try {
       // Get invitation
@@ -252,6 +250,19 @@ class InvitationRepo {
 
       if (invitation.isExpired) {
         return const Left('Invitation has expired');
+      }
+
+      // Convert user_id to patient record ID
+      // patientId parameter is user_id, but linkPatientToFamily needs patient record ID
+      final patientRecord = await _patientService.getPatientByUserId(patientId);
+      String? finalPatientId;
+      
+      if (patientRecord != null && patientRecord['id'] != null) {
+        finalPatientId = patientRecord['id'] as String;
+      } else {
+        // If patient record doesn't exist, try using user_id directly
+        // This handles cases where patient_id in relations table refers to user_id
+        finalPatientId = patientId;
       }
 
       // Determine invitation type
@@ -290,7 +301,7 @@ class InvitationRepo {
 
       // Check if relation already exists
       final exists = await _patientFamilyService.relationExists(
-        patientId: patientId,
+        patientId: finalPatientId,
         familyMemberId: finalFamilyMemberId,
       );
 
@@ -300,9 +311,9 @@ class InvitationRepo {
         return const Right(null);
       }
 
-      // Link patient to family
+      // Link patient to family using patient record ID
       await _patientFamilyService.linkPatientToFamily(
-        patientId: patientId,
+        patientId: finalPatientId,
         familyMemberId: finalFamilyMemberId,
       );
 
