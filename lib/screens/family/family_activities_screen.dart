@@ -1,3 +1,6 @@
+import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
+import 'package:alzcare/core/supabase/activities-service.dart';
+import 'package:alzcare/core/supabase/patient-family-service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -22,61 +25,90 @@ class FamilyActivitiesScreen extends StatefulWidget {
 }
 
 class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
-  // بيانات تشمل اليوم وأيام لاحقة للـ Schedule
-  final List<Map<String, dynamic>> activities = [
-    {
-      'name': 'Breakfast',
-      'description': 'Oatmeal and fruits',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '08:00 AM',
-      'reminderType': 'alarm',
-    },
-    {
-      'name': 'Medicine',
-      'description': 'Blood pressure pill after breakfast',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '09:00 AM',
-      'reminderType': 'alarm',
-    },
-    {
-      'name': 'Lunch',
-      'description': 'Grilled chicken and salad',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '01:00 PM',
-      'reminderType': 'vibrate',
-    },
-    {
-      'name': 'Doctor Visit',
-      'description': 'Clinic appointment',
-      'done': false,
-      'date': DateTime.now().add(const Duration(days: 1)),
-      'time': '10:30 AM',
-      'reminderType': 'alarm',
-    },
-    {
-      'name': 'Evening Walk',
-      'description': '15 minutes walk',
-      'done': false,
-      'date': DateTime.now().add(const Duration(days: 2)),
-      'time': '05:00 PM',
-      'reminderType': 'vibrate',
-    },
-    {
-      'name': 'Dinner',
-      'description': 'Light dinner (soup)',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '07:30 PM',
-      'reminderType': 'alarm',
-    },
-  ];
+  final ActivitiesService _activitiesService = ActivitiesService();
+  final PatientFamilyService _patientFamilyService = PatientFamilyService();
+
+  List<Map<String, dynamic>> activities = [];
+  bool _loading = false;
+  String? _patientRecordId;
+  String? _patientUserId;
 
   // Week state
   DateTime _weekStart = _startOfWeek(DateTime.now());
   DateTime _selectedDay = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActivities();
+  }
+
+  Future<void> _loadActivities() async {
+    setState(() => _loading = true);
+    try {
+      final familyUid = SharedPrefsHelper.getString('familyUid') ??
+          SharedPrefsHelper.getString('userId');
+      if (familyUid == null) {
+        setState(() => _loading = false);
+        return;
+      }
+
+      // Get first patient linked to this family member
+      final patients = await _patientFamilyService.getPatientsByFamily(familyUid);
+      if (patients.isEmpty) {
+        setState(() => _loading = false);
+        return;
+      }
+
+      final patientData = patients.first;
+      final patient = patientData['patients'] as Map<String, dynamic>?;
+      if (patient == null) {
+        setState(() => _loading = false);
+        return;
+      }
+
+      _patientRecordId = patient['id'] as String;
+      _patientUserId = patient['user_id'] as String;
+
+      // Load activities for the week
+      final weekEnd = _weekStart.add(const Duration(days: 6));
+      final loadedActivities = await _activitiesService
+          .getActivitiesForPatientByRecordId(
+        _patientRecordId!,
+        startDate: _weekStart,
+        endDate: weekEnd,
+      );
+
+      setState(() {
+        activities = loadedActivities.map((a) {
+          // Convert database format to UI format
+          final scheduledDate = a['scheduled_date'] as String?;
+          DateTime? date;
+          if (scheduledDate != null) {
+            date = DateTime.tryParse(scheduledDate);
+          }
+
+          return {
+            'id': a['id'],
+            'name': a['name'] ?? '',
+            'description': a['description'] ?? '',
+            'done': a['is_completed'] == true,
+            'date': date ?? DateTime.now(),
+            'time': a['scheduled_time'] ?? '',
+            'reminderType': a['reminder_type'] ?? 'alarm',
+          };
+        }).toList();
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load activities: $e')),
+        );
+      }
+      setState(() => _loading = false);
+    }
+  }
 
   static String _fmt(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
 
@@ -91,7 +123,13 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
   List<Map<String, dynamic>> _activitiesForDay(DateTime day) {
     final ds = _fmt(day);
     final list = activities
-        .where((a) => a['date'] is DateTime && _fmt(a['date']) == ds)
+        .where((a) {
+          final date = a['date'];
+          if (date is DateTime) {
+            return _fmt(date) == ds;
+          }
+          return false;
+        })
         .toList();
     list.sort((a, b) =>
         ((a['time'] ?? '') as String).compareTo((b['time'] ?? '') as String));
@@ -120,10 +158,26 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
 
   Future<void> _deleteActivity(Map<String, dynamic> activity) async {
     if (!await _confirmDelete()) return;
-    setState(() {
-      final idx = activities.indexOf(activity);
-      if (idx != -1) activities.removeAt(idx);
-    });
+
+    final activityId = activity['id'] as String?;
+    if (activityId == null) {
+      // Local only activity, just remove from list
+      setState(() {
+        activities.remove(activity);
+      });
+      return;
+    }
+
+    try {
+      await _activitiesService.deleteActivity(activityId);
+      await _loadActivities();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete activity: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _openEdit(Map<String, dynamic> activity) async {
@@ -131,11 +185,31 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
       context,
       MaterialPageRoute(builder: (_) => EditActivitiesView(activity: activity)),
     );
-    if (updated != null) {
-      setState(() {
-        final idx = activities.indexOf(activity);
-        if (idx != -1) activities[idx] = updated;
-      });
+    if (updated != null && _patientUserId != null) {
+      final activityId = activity['id'] as String?;
+      if (activityId != null) {
+        // Update existing activity
+        try {
+          final date = updated['date'] as DateTime? ?? DateTime.now();
+          await _activitiesService.updateActivity(activityId, {
+            'name': updated['name'] ?? '',
+            'description': updated['description'] ?? '',
+            'scheduled_date': date.toIso8601String().split('T')[0],
+            'scheduled_time': updated['time'] ?? '',
+            'reminder_type': updated['reminderType'] ?? 'alarm',
+          });
+          await _loadActivities();
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to update activity: $e')),
+            );
+          }
+        }
+      } else {
+        // New activity
+        await _addNewActivity(updated);
+      }
     }
   }
 
@@ -145,7 +219,35 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
       MaterialPageRoute(builder: (_) => const EditActivitiesView()),
     );
     if (newActivity != null) {
-      setState(() => activities.add(newActivity));
+      await _addNewActivity(newActivity);
+    }
+  }
+
+  Future<void> _addNewActivity(Map<String, dynamic> activity) async {
+    if (_patientUserId == null) return;
+
+    try {
+      final familyUid = SharedPrefsHelper.getString('familyUid') ??
+          SharedPrefsHelper.getString('userId');
+      final date = activity['date'] as DateTime? ?? DateTime.now();
+
+      await _activitiesService.createActivity(
+        patientId: _patientUserId!,
+        familyMemberId: familyUid,
+        name: activity['name'] ?? '',
+        description: activity['description'] ?? '',
+        scheduledDate: date,
+        scheduledTime: activity['time'] ?? '',
+        reminderType: activity['reminderType'] ?? 'alarm',
+      );
+
+      await _loadActivities();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add activity: $e')),
+        );
+      }
     }
   }
 
@@ -161,6 +263,12 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
     final selectedTotal = selectedList.length;
     final selectedProgress =
         selectedTotal == 0 ? 0.0 : selectedDone / selectedTotal;
+
+    if (_loading && activities.isEmpty) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return DefaultTabController(
       length: 2,
@@ -263,6 +371,7 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                                 _selectedDay = _weekStart
                                     .add(Duration(days: idx < 0 ? 0 : idx));
                               });
+                              _loadActivities();
                             },
                           ),
                           Text(
@@ -283,6 +392,7 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                                 _selectedDay = _weekStart
                                     .add(Duration(days: idx < 0 ? 0 : idx));
                               });
+                              _loadActivities();
                             },
                           ),
                         ],
@@ -389,11 +499,33 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
               // الكارت
               GestureDetector(
                 onTap: () => _openEdit(activity), // Edit
-                onDoubleTap: () {
+                onDoubleTap: () async {
                   // Toggle Done
                   if (idx != -1) {
-                    setState(() => activities[idx]['done'] =
-                        !(activities[idx]['done'] == true));
+                    final activity = activities[idx];
+                    final activityId = activity['id'] as String?;
+                    final currentDone = activity['done'] == true;
+                    final newDone = !currentDone;
+
+                    if (activityId != null) {
+                      try {
+                        await _activitiesService.toggleActivityCompletion(
+                          activityId,
+                          newDone,
+                        );
+                        await _loadActivities();
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to update: $e')),
+                          );
+                        }
+                      }
+                    } else {
+                      setState(() {
+                        activities[idx]['done'] = newDone;
+                      });
+                    }
                   }
                 },
                 child: _ActivityCard(

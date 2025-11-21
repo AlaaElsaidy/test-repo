@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
+import 'package:alzcare/core/supabase/doctor-advice-service.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
@@ -18,6 +20,8 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
   // Tabs: 0 = Create, 1 = My Advice
   int _tabIndex = 0;
 
+  final DoctorAdviceService _adviceService = DoctorAdviceService();
+
   // Tips
   final _tipCtrl = TextEditingController();
   final _tipFocus = FocusNode();
@@ -29,11 +33,15 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
   XFile? _videoXFile;
   VideoPlayerController? _videoCtrl;
 
-  // Stored advice (local)
-  final List<Advice> _adviceList = [];
+  // Stored advice
+  List<Map<String, dynamic>> _adviceList = [];
+  bool _loading = false;
 
-  static const _fakeBaseLink =
-      'https://example.com/advice'; // TODO: backend link
+  @override
+  void initState() {
+    super.initState();
+    _loadAdvice();
+  }
 
   @override
   void dispose() {
@@ -41,6 +49,30 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
     _tipFocus.dispose();
     _videoCtrl?.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAdvice() async {
+    setState(() => _loading = true);
+    try {
+      final doctorId = SharedPrefsHelper.getString('userId');
+      if (doctorId == null) {
+        setState(() => _loading = false);
+        return;
+      }
+
+      final advice = await _adviceService.getAdviceForDoctor(doctorId);
+      setState(() {
+        _adviceList = advice;
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load advice: $e')),
+        );
+      }
+      setState(() => _loading = false);
+    }
   }
 
   // ================= Video =================
@@ -125,17 +157,6 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
     return true;
   }
 
-  Advice _buildAdvice({required bool sent}) {
-    final id = DateTime.now().microsecondsSinceEpoch.toString();
-    return Advice(
-      id: id,
-      tips: List<String>.from(_tips),
-      videoPath: _videoXFile?.path,
-      createdAt: DateTime.now(),
-      sent: sent,
-    );
-  }
-
   void _clearForm() {
     _tips.clear();
     _tipCtrl.clear();
@@ -144,54 +165,103 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
     setState(() {});
   }
 
-  void _saveDraft() {
-    if (!_validateForm()) return;
-    final advice = _buildAdvice(sent: false);
-    setState(() => _adviceList.insert(0, advice));
-    _clearForm();
-    _snack('Saved as draft');
-  }
-
-  void _sendToRelative() {
+  Future<void> _saveDraft() async {
     if (!_validateForm()) return;
 
-    final advice = _buildAdvice(sent: true);
-    setState(() => _adviceList.insert(0, advice));
+    try {
+      final doctorId = SharedPrefsHelper.getString('userId');
+      if (doctorId == null) {
+        _snack('Doctor ID not found');
+        return;
+      }
 
-    final link = '$_fakeBaseLink/${advice.id}';
-    final tipsText =
-        advice.tips.isEmpty ? '' : advice.tips.map((t) => '• $t').join('\n');
-    final shareText = 'Doctor Advice'
-        '${tipsText.isEmpty ? '' : '\n\nTips:\n$tipsText'}'
-        '\n\nOpen advice: $link';
+      String? videoUrl;
+      String? videoStoragePath;
 
-    if (advice.videoPath != null) {
-      Share.shareXFiles(
-        [XFile(advice.videoPath!)],
-        text: shareText,
-        subject: 'Doctor Advice',
+      // Upload video if exists
+      if (_videoXFile != null) {
+        _snack('Uploading video...');
+        videoUrl = await _adviceService.uploadVideo(doctorId, File(_videoXFile!.path));
+        videoStoragePath = _adviceService.getVideoStoragePath(doctorId, _videoXFile!.name);
+      }
+
+      await _adviceService.createAdvice(
+        doctorId: doctorId,
+        tips: _tips.isEmpty ? null : _tips,
+        videoUrl: videoUrl,
+        videoStoragePath: videoStoragePath,
+        isDraft: true,
       );
-    } else {
-      Share.share(shareText, subject: 'Doctor Advice');
+
+      _clearForm();
+      await _loadAdvice();
+      _snack('Saved as draft');
+    } catch (e) {
+      _snack('Failed to save draft: $e');
     }
-
-    _clearForm();
   }
 
-  void _shareExisting(Advice advice) {
-    final link = '$_fakeBaseLink/${advice.id}';
-    final tipsText =
-        advice.tips.isEmpty ? '' : advice.tips.map((t) => '• $t').join('\n');
-    final shareText = 'Doctor Advice'
-        '${tipsText.isEmpty ? '' : '\n\nTips:\n$tipsText'}'
-        '\n\nOpen advice: $link';
+  Future<void> _sendToRelative() async {
+    if (!_validateForm()) return;
 
-    if (advice.videoPath != null) {
-      Share.shareXFiles(
-        [XFile(advice.videoPath!)],
-        text: shareText,
-        subject: 'Doctor Advice',
+    try {
+      final doctorId = SharedPrefsHelper.getString('userId');
+      if (doctorId == null) {
+        _snack('Doctor ID not found');
+        return;
+      }
+
+      // Get family members linked to this doctor
+      final familyMembers = await _adviceService.getFamilyMembersForDoctor(doctorId);
+      if (familyMembers.isEmpty) {
+        _snack('No family members linked to your account');
+        return;
+      }
+
+      String? videoUrl;
+      String? videoStoragePath;
+
+      // Upload video if exists
+      if (_videoXFile != null) {
+        _snack('Uploading video...');
+        videoUrl = await _adviceService.uploadVideo(doctorId, File(_videoXFile!.path));
+        videoStoragePath = _adviceService.getVideoStoragePath(doctorId, _videoXFile!.name);
+      }
+
+      // Create advice
+      final advice = await _adviceService.createAdvice(
+        doctorId: doctorId,
+        tips: _tips.isEmpty ? null : _tips,
+        videoUrl: videoUrl,
+        videoStoragePath: videoStoragePath,
+        isDraft: false,
       );
+
+      // Send to all family members
+      final familyMemberIds = familyMembers.map((fm) => fm['id'] as String).toList();
+      await _adviceService.sendAdviceToFamilyMembers(
+        adviceId: advice['id'] as String,
+        familyMemberIds: familyMemberIds,
+      );
+
+      _clearForm();
+      await _loadAdvice();
+      _snack('Advice sent to ${familyMemberIds.length} family member(s)');
+    } catch (e) {
+      _snack('Failed to send advice: $e');
+    }
+  }
+
+  void _shareExisting(Map<String, dynamic> advice) {
+    final tips = (advice['tips'] as List<dynamic>?)?.cast<String>() ?? [];
+    final videoUrl = advice['video_url'] as String?;
+
+    final tipsText = tips.isEmpty ? '' : tips.map((t) => '• $t').join('\n');
+    final shareText = 'Doctor Advice'
+        '${tipsText.isEmpty ? '' : '\n\nTips:\n$tipsText'}';
+
+    if (videoUrl != null) {
+      Share.share(shareText + '\n\nVideo: $videoUrl', subject: 'Doctor Advice');
     } else {
       Share.share(shareText, subject: 'Doctor Advice');
     }
@@ -202,12 +272,18 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  String _formatDate(DateTime d) {
-    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')} '
-        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return '—';
+    try {
+      final d = DateTime.parse(dateStr);
+      return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')} '
+          '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return dateStr;
+    }
   }
 
-  void _openAdviceDetails(Advice a) {
+  void _openAdviceDetails(Map<String, dynamic> a) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -255,16 +331,20 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: (a.sent ? Colors.green : Colors.orange)
+                        color: ((a['is_draft'] as bool?) == false
+                                ? Colors.green
+                                : Colors.orange)
                             .withOpacity(0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        a.sent ? 'Sent' : 'Draft',
+                        (a['is_draft'] as bool?) == false ? 'Sent' : 'Draft',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: a.sent ? Colors.green : Colors.orange,
+                          color: (a['is_draft'] as bool?) == false
+                              ? Colors.green
+                              : Colors.orange,
                         ),
                       ),
                     ),
@@ -272,110 +352,122 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _formatDate(a.createdAt),
+                  _formatDate(a['created_at'] as String?),
                   style: const TextStyle(fontSize: 12, color: AppTheme.gray500),
                 ),
                 const SizedBox(height: 12),
-                if (a.videoPath != null)
-                  _InlineVideoPreview(path: a.videoPath!),
-                if (a.videoPath != null) const SizedBox(height: 12),
-                if (a.tips.isNotEmpty) ...[
-                  const Text(
-                    'Tips',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.teal900,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  ...a.tips.map(
-                    (t) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('•  ',
-                              style: TextStyle(
-                                  fontSize: 18, color: AppTheme.teal600)),
-                          Expanded(
-                            child: Text(
-                              t,
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  height: 1.5,
-                                  color: AppTheme.gray600),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                LayoutBuilder(
-                  builder: (context, c) {
-                    final narrow = c.maxWidth < 380;
-                    if (narrow) {
-                      return Column(
-                        children: [
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: OutlinedButton.icon(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.close),
-                              label: const Text('Close'),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton.icon(
-                              onPressed: () => _shareExisting(a),
-                              icon: const Icon(Icons.share),
-                              label: const Text('Share'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.teal600,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-                    return Row(
+                Builder(
+                  builder: (context) {
+                    final videoUrl = a['video_url'] as String?;
+                    final tips = (a['tips'] as List<dynamic>?)?.cast<String>() ?? [];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: OutlinedButton.icon(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.close),
-                              label: const Text('Close'),
+                        if (videoUrl != null) ...[
+                          _InlineVideoPreview(url: videoUrl),
+                          const SizedBox(height: 12),
+                        ],
+                        if (tips.isNotEmpty) ...[
+                          const Text(
+                            'Tips',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.teal900,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: ElevatedButton.icon(
-                              onPressed: () => _shareExisting(a),
-                              icon: const Icon(Icons.share),
-                              label: const Text('Share'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.teal600,
-                                foregroundColor: Colors.white,
+                          const SizedBox(height: 6),
+                          ...tips.map(
+                            (t) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('•  ',
+                                      style: TextStyle(
+                                          fontSize: 18, color: AppTheme.teal600)),
+                                  Expanded(
+                                    child: Text(
+                                      t,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          height: 1.5,
+                                          color: AppTheme.gray600),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
+                        ],
+                        const SizedBox(height: 16),
+                        LayoutBuilder(
+                          builder: (context, c) {
+                            final narrow = c.maxWidth < 380;
+                            if (narrow) {
+                              return Column(
+                                children: [
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () => Navigator.pop(context),
+                                      icon: const Icon(Icons.close),
+                                      label: const Text('Close'),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () => _shareExisting(a),
+                                      icon: const Icon(Icons.share),
+                                      label: const Text('Share'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.teal600,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 48,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () => Navigator.pop(context),
+                                      icon: const Icon(Icons.close),
+                                      label: const Text('Close'),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 48,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () => _shareExisting(a),
+                                      icon: const Icon(Icons.share),
+                                      label: const Text('Share'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.teal600,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     );
                   },
-                )
+                ),
               ],
             ),
           ),
@@ -790,9 +882,16 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
       );
     }
 
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Column(
       children: _adviceList.map((a) {
-        final snippet = a.tips.isNotEmpty ? a.tips.first : 'No tips';
+        final tips = (a['tips'] as List<dynamic>?)?.cast<String>() ?? [];
+        final snippet = tips.isNotEmpty ? tips.first : 'No tips';
+        final videoUrl = a['video_url'] as String?;
+        final isDraft = (a['is_draft'] as bool?) ?? true;
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Card(
@@ -813,7 +912,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
-                        a.videoPath == null
+                        videoUrl == null
                             ? Icons.description
                             : Icons.play_circle,
                         color: AppTheme.teal600,
@@ -850,17 +949,17 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: (a.sent ? Colors.green : Colors.orange)
+                                  color: (!isDraft ? Colors.green : Colors.orange)
                                       .withOpacity(0.12),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  a.sent ? 'Sent' : 'Draft',
+                                  !isDraft ? 'Sent' : 'Draft',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
                                     color:
-                                        a.sent ? Colors.green : Colors.orange,
+                                        !isDraft ? Colors.green : Colors.orange,
                                   ),
                                 ),
                               ),
@@ -869,7 +968,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                                   size: 14, color: AppTheme.gray500),
                               const SizedBox(width: 4),
                               Text(
-                                _formatDate(a.createdAt),
+                                _formatDate(a['created_at'] as String?),
                                 style: const TextStyle(
                                     fontSize: 12, color: AppTheme.gray500),
                               ),
@@ -878,7 +977,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              if (a.videoPath != null) ...[
+                              if (videoUrl != null) ...[
                                 const Icon(Icons.videocam,
                                     size: 14, color: AppTheme.gray600),
                                 const SizedBox(width: 4),
@@ -890,7 +989,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                               const Icon(Icons.tips_and_updates,
                                   size: 14, color: AppTheme.gray600),
                               const SizedBox(width: 4),
-                              Text('${a.tips.length} tip(s)',
+                              Text('${tips.length} tip(s)',
                                   style: const TextStyle(
                                       fontSize: 12, color: AppTheme.gray600)),
                             ],
@@ -965,9 +1064,10 @@ class _VideoPickerPlaceholder extends StatelessWidget {
 }
 
 class _InlineVideoPreview extends StatefulWidget {
-  final String path;
+  final String? path;
+  final String? url;
 
-  const _InlineVideoPreview({required this.path});
+  const _InlineVideoPreview({this.path, this.url});
 
   @override
   State<_InlineVideoPreview> createState() => _InlineVideoPreviewState();
@@ -979,10 +1079,17 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
   @override
   void initState() {
     super.initState();
-    _ctrl = VideoPlayerController.file(File(widget.path))
-      ..initialize().then((_) {
-        if (mounted) setState(() {});
-      });
+    if (widget.path != null) {
+      _ctrl = VideoPlayerController.file(File(widget.path!))
+        ..initialize().then((_) {
+          if (mounted) setState(() {});
+        });
+    } else if (widget.url != null) {
+      _ctrl = VideoPlayerController.networkUrl(Uri.parse(widget.url!))
+        ..initialize().then((_) {
+          if (mounted) setState(() {});
+        });
+    }
     _ctrl?.setLooping(true);
   }
 
@@ -1024,40 +1131,6 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ================== Model ==================
-
-class Advice {
-  final String id;
-  final List<String> tips;
-  final String? videoPath;
-  final DateTime createdAt;
-  final bool sent;
-
-  Advice({
-    required this.id,
-    required this.tips,
-    required this.videoPath,
-    required this.createdAt,
-    required this.sent,
-  });
-
-  Advice copyWith({
-    String? id,
-    List<String>? tips,
-    String? videoPath,
-    DateTime? createdAt,
-    bool? sent,
-  }) {
-    return Advice(
-      id: id ?? this.id,
-      tips: tips ?? this.tips,
-      videoPath: videoPath ?? this.videoPath,
-      createdAt: createdAt ?? this.createdAt,
-      sent: sent ?? this.sent,
     );
   }
 }

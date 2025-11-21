@@ -1,12 +1,49 @@
 import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
+import 'package:alzcare/core/supabase/doctor-advice-service.dart';
 import 'package:alzcare/core/supabase/patient-family-service.dart';
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../../theme/app_theme.dart';
 
-class FamilyDashboard extends StatelessWidget {
+class FamilyDashboard extends StatefulWidget {
   const FamilyDashboard({super.key});
+
+  @override
+  State<FamilyDashboard> createState() => _FamilyDashboardState();
+}
+
+class _FamilyDashboardState extends State<FamilyDashboard> {
+  final DoctorAdviceService _adviceService = DoctorAdviceService();
+  List<Map<String, dynamic>> _doctorAdvice = [];
+  bool _loadingAdvice = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDoctorAdvice();
+  }
+
+  Future<void> _loadDoctorAdvice() async {
+    setState(() => _loadingAdvice = true);
+    try {
+      final familyUid = SharedPrefsHelper.getString("familyUid") ??
+          SharedPrefsHelper.getString("userId");
+      if (familyUid == null) {
+        setState(() => _loadingAdvice = false);
+        return;
+      }
+
+      final advice = await _adviceService.getAdviceForFamilyMember(familyUid);
+      setState(() {
+        _doctorAdvice = advice;
+        _loadingAdvice = false;
+      });
+    } catch (e) {
+      setState(() => _loadingAdvice = false);
+    }
+  }
 
   Future<List<Map<String, dynamic>>> _loadLinkedPatients() async {
     try {
@@ -27,21 +64,6 @@ class FamilyDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // قائمة فيديوهات: نفس الفيديو مكرر 3 مرات
-    final videoTips = const [
-      VideoTip(
-        title: 'نصائح للتعامل مع الزهايمر (1)',
-        youtubeId: 'rfYW0Ih7J5Q',
-      ),
-      VideoTip(
-        title: 'نصائح للتعامل مع الزهايمر (2)',
-        youtubeId: 'rfYW0Ih7J5Q',
-      ),
-      VideoTip(
-        title: 'نصائح للتعامل مع الزهايمر (3)',
-        youtubeId: 'rfYW0Ih7J5Q',
-      ),
-    ];
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -299,16 +321,10 @@ class FamilyDashboard extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Video Tips section
-            VideoTipsSection(
-              videos: videoTips,
-              onOpen: (tip) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => VideoTipPlayerScreen(tip: tip),
-                  ),
-                );
-              },
+            _DoctorAdviceSection(
+              advice: _doctorAdvice,
+              loading: _loadingAdvice,
+              onRefresh: _loadDoctorAdvice,
             ),
             const SizedBox(height: 16),
 
@@ -375,7 +391,374 @@ class FamilyDashboard extends StatelessWidget {
   }
 }
 
-// ---------- Video Tips widgets/models ----------
+// ---------- Doctor Advice Section ----------
+
+class _DoctorAdviceSection extends StatelessWidget {
+  final List<Map<String, dynamic>> advice;
+  final bool loading;
+  final VoidCallback onRefresh;
+
+  const _DoctorAdviceSection({
+    required this.advice,
+    required this.loading,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 8, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Doctor Advice',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.teal900,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: onRefresh,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (loading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (advice.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(
+                  child: Text(
+                    'No advice from doctor yet',
+                    style: TextStyle(color: AppTheme.gray600),
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                height: 140,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(right: 12),
+                  itemCount: advice.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (_, i) {
+                    final a = advice[i];
+                    final adviceData = a['doctor_advice'] as Map<String, dynamic>?;
+                    if (adviceData == null) return const SizedBox.shrink();
+
+                    final tips = (adviceData['tips'] as List<dynamic>?)?.cast<String>() ?? [];
+                    final videoUrl = adviceData['video_url'] as String?;
+                    final title = adviceData['title'] as String? ?? 'Doctor Advice';
+                    final doctorInfo = adviceData['users'] as Map<String, dynamic>?;
+                    final doctorName = doctorInfo?['name'] as String? ?? 'Doctor';
+
+                    return _DoctorAdviceCard(
+                      title: title,
+                      doctorName: doctorName,
+                      tips: tips,
+                      videoUrl: videoUrl,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => _DoctorAdviceDetailScreen(
+                              advice: adviceData,
+                              doctorName: doctorName,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DoctorAdviceCard extends StatelessWidget {
+  final String title;
+  final String doctorName;
+  final List<String> tips;
+  final String? videoUrl;
+  final VoidCallback onTap;
+
+  const _DoctorAdviceCard({
+    required this.title,
+    required this.doctorName,
+    required this.tips,
+    this.videoUrl,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 220,
+        decoration: BoxDecoration(
+          color: AppTheme.teal50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.gray200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // thumbnail or icon
+            ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
+              child: Container(
+                height: 100,
+                width: double.infinity,
+                color: AppTheme.teal100,
+                child: videoUrl != null
+                    ? Stack(
+                        children: [
+                          const Center(
+                            child: Icon(Icons.videocam,
+                                size: 48, color: AppTheme.teal600),
+                          ),
+                          Positioned.fill(
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black45,
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: const Icon(Icons.play_arrow,
+                                    color: Colors.white, size: 28),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : const Center(
+                        child: Icon(Icons.tips_and_updates,
+                            size: 48, color: AppTheme.teal600),
+                      ),
+              ),
+            ),
+            // title
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppTheme.teal900,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'By $doctorName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppTheme.gray600,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (tips.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '${tips.length} tip(s)',
+                        style: const TextStyle(
+                          color: AppTheme.gray500,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DoctorAdviceDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> advice;
+  final String doctorName;
+
+  const _DoctorAdviceDetailScreen({
+    required this.advice,
+    required this.doctorName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tips = (advice['tips'] as List<dynamic>?)?.cast<String>() ?? [];
+    final videoUrl = advice['video_url'] as String?;
+    final title = advice['title'] as String? ?? 'Doctor Advice';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        backgroundColor: AppTheme.teal600,
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'By $doctorName',
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppTheme.gray600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (videoUrl != null) ...[
+              _VideoPlayerWidget(url: videoUrl),
+              const SizedBox(height: 16),
+            ],
+            if (tips.isNotEmpty) ...[
+              const Text(
+                'Tips',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.teal900,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...tips.map(
+                (tip) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('•  ',
+                          style: TextStyle(
+                              fontSize: 18, color: AppTheme.teal600)),
+                      Expanded(
+                        child: Text(
+                          tip,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: AppTheme.gray600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoPlayerWidget extends StatefulWidget {
+  final String url;
+
+  const _VideoPlayerWidget({required this.url});
+
+  @override
+  State<_VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
+}
+
+class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
+  VideoPlayerController? _controller;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => _initialized = true);
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_initialized || _controller == null) {
+      return Container(
+        height: 200,
+        color: Colors.black12,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return AspectRatio(
+      aspectRatio: _controller!.value.aspectRatio,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          VideoPlayer(_controller!),
+          IconButton(
+            iconSize: 64,
+            color: Colors.white,
+            onPressed: () {
+              setState(() {
+                if (_controller!.value.isPlaying) {
+                  _controller!.pause();
+                } else {
+                  _controller!.play();
+                }
+              });
+            },
+            icon: Icon(
+              _controller!.value.isPlaying
+                  ? Icons.pause_circle
+                  : Icons.play_circle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------- Video Tips widgets/models (kept for backward compatibility) ----------
 
 class VideoTip {
   final String title;

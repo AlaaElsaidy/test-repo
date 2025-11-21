@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
+import 'package:alzcare/core/supabase/tracking-service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
@@ -20,17 +22,10 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   Position? _pos;
   DateTime? _lastUpdated;
   String? _address;
+  bool _insideAnyZone = true;
 
-  // Safe Zones (example – adjust as you like)
-  final List<_SafeZone> _safeZones = const [
-    _SafeZone(
-      name: 'Home',
-      lat: 31.034350,
-      lng: 30.471819,
-      radiusMeters: 20,
-      isActive: true,
-    ),
-  ];
+  final TrackingService _trackingService = TrackingService();
+  List<Map<String, dynamic>> _safeZones = [];
 
   // Emergency phone (edit as needed) — يمكن ترك + هنا، هنحوله digits في دالة واتساب
   final String _emergencyPhone = '+201210402952';
@@ -38,7 +33,73 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   @override
   void initState() {
     super.initState();
+    _loadSafeZones();
     _getCurrentLocation();
+  }
+
+  Future<void> _loadSafeZones() async {
+    try {
+      final patientUid = SharedPrefsHelper.getString('patientUid');
+      if (patientUid == null) return;
+
+      final zones = await _trackingService.getSafeZonesForPatient(patientUid);
+      setState(() {
+        _safeZones = zones;
+      });
+      _checkSafeZoneStatus();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load safe zones: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _checkSafeZoneStatus() async {
+    if (_pos == null) return;
+
+    try {
+      final patientUid = SharedPrefsHelper.getString('patientUid');
+      if (patientUid == null) return;
+
+      final isInside = await _trackingService.isLocationInSafeZone(
+        patientId: patientUid,
+        latitude: _pos!.latitude,
+        longitude: _pos!.longitude,
+      );
+
+      setState(() => _insideAnyZone = isInside);
+    } catch (e) {
+      // Silently fail - use local calculation as fallback
+      _calculateLocalSafeZoneStatus();
+    }
+  }
+
+  void _calculateLocalSafeZoneStatus() {
+    if (_pos == null) {
+      setState(() => _insideAnyZone = true);
+      return;
+    }
+
+    for (final zone in _safeZones) {
+      if (zone['is_active'] != true) continue;
+
+      final distance = _distanceMeters(
+        _pos!.latitude,
+        _pos!.longitude,
+        (zone['latitude'] as num).toDouble(),
+        (zone['longitude'] as num).toDouble(),
+      );
+
+      final radius = (zone['radius_meters'] as num).toDouble();
+      if (distance <= radius) {
+        setState(() => _insideAnyZone = true);
+        return;
+      }
+    }
+
+    setState(() => _insideAnyZone = false);
   }
 
   // Permissions + current location
@@ -95,12 +156,30 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         addr = null;
       }
 
+      // Save location to Supabase
+      final patientUid = SharedPrefsHelper.getString('patientUid');
+      if (patientUid != null) {
+        try {
+          await _trackingService.savePatientLocation(
+            patientId: patientUid,
+            latitude: position.latitude,
+            longitude: position.longitude,
+            address: addr,
+          );
+        } catch (e) {
+          debugPrint('Failed to save location to Supabase: $e');
+        }
+      }
+
       setState(() {
         _pos = position;
         _address = addr;
         _lastUpdated = DateTime.now();
         _loading = false;
       });
+
+      // Check safe zone status
+      _checkSafeZoneStatus();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -227,15 +306,6 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     return r * c;
   }
 
-  bool get _insideAnyZone {
-    if (_pos == null) return true; // until first fix, treat as safe
-    for (final z in _safeZones) {
-      if (!z.isActive) continue;
-      final d = _distanceMeters(_pos!.latitude, _pos!.longitude, z.lat, z.lng);
-      if (d <= z.radiusMeters) return true;
-    }
-    return false;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -563,20 +633,4 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       ),
     );
   }
-}
-
-// Models
-class _SafeZone {
-  final String name;
-  final double lat;
-  final double lng;
-  final double radiusMeters;
-  final bool isActive;
-  const _SafeZone({
-    required this.name,
-    required this.lat,
-    required this.lng,
-    required this.radiusMeters,
-    required this.isActive,
-  });
 }

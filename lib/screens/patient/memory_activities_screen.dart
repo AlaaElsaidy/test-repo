@@ -1,3 +1,5 @@
+import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
+import 'package:alzcare/core/supabase/activities-service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -22,60 +24,68 @@ class MemoryActivitiesScreen extends StatefulWidget {
 }
 
 class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
-  final List<Map<String, dynamic>> activities = [
-    {
-      'name': 'Breakfast',
-      'description': 'Oatmeal and fruits',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '08:00 AM',
-      'reminderType': 'alarm',
-    },
-    {
-      'name': 'Medicine',
-      'description': 'Blood pressure pill after breakfast',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '09:00 AM',
-      'reminderType': 'alarm',
-    },
-    {
-      'name': 'Lunch',
-      'description': 'Grilled chicken and salad',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '01:00 PM',
-      'reminderType': 'vibrate',
-    },
-    {
-      'name': 'Doctor Visit',
-      'description': 'Clinic appointment',
-      'done': false,
-      'date': DateTime.now().add(const Duration(days: 1)),
-      'time': '10:30 AM',
-      'reminderType': 'alarm',
-    },
-    {
-      'name': 'Evening Walk',
-      'description': '15 minutes walk',
-      'done': false,
-      'date': DateTime.now().add(const Duration(days: 2)),
-      'time': '05:00 PM',
-      'reminderType': 'vibrate',
-    },
-    {
-      'name': 'Dinner',
-      'description': 'Light dinner (soup)',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '07:30 PM',
-      'reminderType': 'alarm',
-    },
-  ];
+  final ActivitiesService _activitiesService = ActivitiesService();
+
+  List<Map<String, dynamic>> activities = [];
+  bool _loading = false;
 
   // Week state
   DateTime _weekStart = _startOfWeek(DateTime.now());
   DateTime _selectedDay = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActivities();
+  }
+
+  Future<void> _loadActivities() async {
+    setState(() => _loading = true);
+    try {
+      final patientUid = SharedPrefsHelper.getString('patientUid');
+      if (patientUid == null) {
+        setState(() => _loading = false);
+        return;
+      }
+
+      // Load activities for the week
+      final weekEnd = _weekStart.add(const Duration(days: 6));
+      final loadedActivities = await _activitiesService.getActivitiesForPatient(
+        patientUid,
+        startDate: _weekStart,
+        endDate: weekEnd,
+      );
+
+      setState(() {
+        activities = loadedActivities.map((a) {
+          // Convert database format to UI format
+          final scheduledDate = a['scheduled_date'] as String?;
+          DateTime? date;
+          if (scheduledDate != null) {
+            date = DateTime.tryParse(scheduledDate);
+          }
+
+          return {
+            'id': a['id'],
+            'name': a['name'] ?? '',
+            'description': a['description'] ?? '',
+            'done': a['is_completed'] == true,
+            'date': date ?? DateTime.now(),
+            'time': a['scheduled_time'] ?? '',
+            'reminderType': a['reminder_type'] ?? 'alarm',
+          };
+        }).toList();
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load activities: $e')),
+        );
+      }
+      setState(() => _loading = false);
+    }
+  }
 
   static String _fmt(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
 
@@ -90,7 +100,13 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
   List<Map<String, dynamic>> _activitiesForDay(DateTime day) {
     final ds = _fmt(day);
     final list = activities
-        .where((a) => a['date'] is DateTime && _fmt(a['date']) == ds)
+        .where((a) {
+          final date = a['date'];
+          if (date is DateTime) {
+            return _fmt(date) == ds;
+          }
+          return false;
+        })
         .toList();
     list.sort((a, b) =>
         ((a['time'] ?? '') as String).compareTo((b['time'] ?? '') as String));
@@ -99,6 +115,12 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading && activities.isEmpty) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final todayList = _activitiesForDay(DateTime.now());
     final todayDone = todayList.where((e) => e['done'] == true).length;
     final todayTotal = todayList.length;
@@ -207,6 +229,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                                 _selectedDay = _weekStart
                                     .add(Duration(days: idx < 0 ? 0 : idx));
                               });
+                              _loadActivities();
                             },
                           ),
                           Text(
@@ -227,6 +250,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                                 _selectedDay = _weekStart
                                     .add(Duration(days: idx < 0 ? 0 : idx));
                               });
+                              _loadActivities();
                             },
                           ),
                         ],
@@ -330,10 +354,32 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
           padding: const EdgeInsets.only(bottom: 12),
           child: GestureDetector(
             // المريض: Toggle Done فقط
-            onTap: () {
+            onTap: () async {
               if (idx != -1) {
-                setState(() => activities[idx]['done'] =
-                    !(activities[idx]['done'] == true));
+                final activity = activities[idx];
+                final activityId = activity['id'] as String?;
+                final currentDone = activity['done'] == true;
+                final newDone = !currentDone;
+
+                if (activityId != null) {
+                  try {
+                    await _activitiesService.toggleActivityCompletion(
+                      activityId,
+                      newDone,
+                    );
+                    await _loadActivities();
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to update: $e')),
+                      );
+                    }
+                  }
+                } else {
+                  setState(() {
+                    activities[idx]['done'] = newDone;
+                  });
+                }
               }
             },
             child: _ActivityCard(
