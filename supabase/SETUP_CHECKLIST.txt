@@ -1,0 +1,261 @@
+📋 SUPABASE SETUP CHECKLIST
+============================
+
+اتبع هذه الخطوات بالتحديد:
+
+---
+
+☐ **الخطوة 1: تطبيق الجداول**
+  📄 ملف: supabase/migrations/20251122_create_tracking_tables.sql
+  
+  1. اذهب: https://app.supabase.com → مشروعك
+  2. SQL Editor → New Query
+  3. انسخ الملف كاملاً
+  4. اضغط: Execute
+  
+  ✓ النتيجة: "Successfully executed"
+
+---
+
+☐ **الخطوة 2: تفعيل Real-time**
+  📄 ملف: supabase/SETUP_QUERIES.sql (الجزء 1)
+  
+  شغّل هذا الكويري:
+  
+  ```sql
+  ALTER PUBLICATION supabase_realtime ADD TABLE safe_zones;
+  ALTER PUBLICATION supabase_realtime ADD TABLE location_updates;
+  ALTER PUBLICATION supabase_realtime ADD TABLE location_history;
+  ALTER PUBLICATION supabase_realtime ADD TABLE emergency_contacts;
+  ```
+
+  ✓ النتيجة: "Successfully executed"
+
+---
+
+☐ **الخطوة 3: التحقق من الجداول**
+  📄 ملف: supabase/SETUP_QUERIES.sql (الجزء 5)
+  
+  شغّل هذا الكويري:
+  
+  ```sql
+  SELECT table_name FROM information_schema.tables 
+  WHERE table_schema = 'public' 
+  AND table_name IN ('safe_zones', 'location_updates', 'location_history', 'emergency_contacts');
+  ```
+
+  ✓ النتيجة: 4 جداول
+  ```
+  safe_zones
+  location_updates
+  location_history
+  emergency_contacts
+  ```
+
+---
+
+☐ **الخطوة 4: التحقق من RLS Policies**
+  📄 ملف: supabase/SETUP_QUERIES.sql (الجزء 2)
+  
+  شغّل هذا الكويري:
+  
+  ```sql
+  SELECT schemaname, tablename, policyname 
+  FROM pg_policies 
+  WHERE tablename IN ('safe_zones', 'location_updates', 'location_history', 'emergency_contacts')
+  ORDER BY tablename, policyname;
+  ```
+
+  ✓ النتيجة: 13 سياسة أمان
+
+---
+
+☐ **الخطوة 5: التحقق من Indexes**
+  📄 ملف: supabase/SETUP_QUERIES.sql (الجزء 8)
+  
+  شغّل هذا الكويري:
+  
+  ```sql
+  SELECT indexname FROM pg_indexes 
+  WHERE tablename IN ('safe_zones', 'location_updates', 'location_history', 'emergency_contacts')
+  ORDER BY indexname;
+  ```
+
+  ✓ النتيجة: 10 indexes على الأقل
+
+---
+
+☐ **الخطوة 6: إضافة بيانات اختبار (اختياري)**
+  📄 ملف: supabase/SETUP_QUERIES.sql (الجزء 4)
+  
+  1. اضغط: Table Editor (في القائمة)
+  2. اختر: safe_zones
+  3. اضغط: Insert Row
+  4. أضف:
+     - name: البيت
+     - latitude: 30.0444
+     - longitude: 31.2357
+     - radius_meters: 500
+  
+  ✓ النتيجة: صف جديد في الجدول
+
+---
+
+☐ **الخطوة 7: اختبار API من التطبيق**
+  📄 ملف: lib/core/tests/tracking_test_example.dart
+  
+  1. أضف في main.dart:
+  
+  ```dart
+  import 'lib/core/tests/tracking_test_example.dart';
+  
+  void main() async {
+    // ... init code ...
+    await testTrackingSystem();
+    runApp(const MyApp());
+  }
+  ```
+  
+  2. شغّل التطبيق
+  3. شوف الـ console
+  
+  ✓ يجب تشوف رسائل النجاح
+
+---
+
+☐ **الخطوة 8: دمج PatientTrackingCubit**
+  📄 ملف: lib/screens/patient/live_tracking_screen.dart
+  
+  استبدل الكود القديم أو أضف:
+  
+  ```dart
+  import 'package:flutter_bloc/flutter_bloc.dart';
+  import 'cubit/patient_tracking_cubit.dart';
+  
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => PatientTrackingCubit(
+        getIt<TrackingRepository>(),
+        userId,
+      )..initializeTracking(),
+      
+      child: BlocBuilder<PatientTrackingCubit, PatientTrackingState>(
+        builder: (context, state) {
+          // عرض الموقع والمناطق
+          return _buildUI(state);
+        },
+      ),
+    );
+  }
+  ```
+  
+  ✓ النتيجة: شاشة المريض تعرض الموقع الحي
+
+---
+
+☐ **الخطوة 9: دمج FamilyTrackingCubit**
+  📄 ملف: lib/screens/family/family_tracking_screen.dart
+  
+  نفس الطريقة ولكن مع FamilyTrackingCubit:
+  
+  ```dart
+  import 'cubit/family_tracking_cubit.dart';
+  
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => FamilyTrackingCubit(
+        getIt<TrackingRepository>(),
+        selectedPatientId,
+      )..initializeTracking(),
+      
+      child: BlocBuilder<FamilyTrackingCubit, FamilyTrackingState>(
+        builder: (context, state) {
+          // 3 tabs: Live, Zones, History
+          return _buildTabsUI(state);
+        },
+      ),
+    );
+  }
+  ```
+  
+  ✓ النتيجة: شاشة العائلة تعرض 3 tabs
+
+---
+
+☐ **الخطوة 10: اختبار شامل**
+  
+  1. شغّل التطبيق
+  2. تأكد من:
+     ✅ يظهر الموقع الحالي
+     ✅ المناطق الآمنة تظهر
+     ✅ حالة الأمان تتغير (أخضر/برتقالي)
+     ✅ التحديثات تظهر فوريًا
+     ✅ السجل يظهر
+  
+  3. اختبر إضافة منطقة جديدة
+  4. اختبر تشغيل/إيقاف المنطقة
+  
+  ✓ كل شيء يعمل بشكل صحيح!
+
+---
+
+⏱️ **الوقت الإجمالي:**
+- Database Setup: 5 دقائق
+- Real-time Config: 2 دقيقة
+- Verification: 5 دقائق
+- Integration: 15 دقيقة
+- Testing: 10 دقائق
+
+**المجموع: ~37 دقيقة**
+
+---
+
+❌ **الأخطاء الشائعة وحلولها:**
+
+**❌ "Migration already exists"**
+→ التكرار يحدث إذا حاولت تطبيق Migration مرتين
+→ الحل: تجاهل الخطأ وتابع
+
+**❌ "Syntax error in SQL"**
+→ غالباً من نسخ جزء من الكود فقط
+→ الحل: انسخ الملف كاملاً
+
+**❌ "Table does not exist"**
+→ لم تطبق Migration بنجاح
+→ الحل: اعد تطبيق 20251122_create_tracking_tables.sql
+
+**❌ "RLS policy violation"**
+→ استخدم patient_id مختلف
+→ الحل: استخدم patient_id الصحيح
+
+**❌ "Realtime not working"**
+→ لم تطبق ALTER PUBLICATION
+→ الحل: طبق الجزء 1 من SETUP_QUERIES.sql
+
+**❌ "Cannot find widget"**
+→ لم تضف BlocProvider بشكل صحيح
+→ الحل: تأكد من import و BlocProvider أعلى الشاشة
+
+---
+
+✅ **بعد انتهائك من كل الخطوات:**
+
+1. ✓ Database Schema جاهز
+2. ✓ Real-time Streams يعمل
+3. ✓ RLS Security مفعّل
+4. ✓ Cubits موجود في الشاشات
+5. ✓ التحديثات الفورية تعمل
+6. ✓ الأمان يتم حسابه تلقائيًا
+7. ✓ السجل يُحفظ تلقائيًا
+
+**🎉 النظام كامل وجاهز!**
+
+---
+
+📞 **للمساعدة:**
+
+- اقرأ SETUP_STEPS_AR.md للشرح التفصيلي
+- اقرأ TRACKING_IMPLEMENTATION_STEPS.md للتفاصيل الكاملة
+- استخدم الملفات الموجودة في lib/core/tests للاختبار
