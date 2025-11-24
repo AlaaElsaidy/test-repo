@@ -99,9 +99,11 @@ class PatientService {
     final fileName = 'patient_$patientId.jpg';
     final bucket = _client.storage.from('patientImg');
 
-    await bucket.remove([fileName]).catchError((e) {});
+    try {
+      await bucket.remove([fileName]);
+    } catch (_) {}
 
-    final response = await bucket.upload(fileName, imageFile,
+    await bucket.upload(fileName, imageFile,
         fileOptions: const FileOptions(upsert: true));
 
     final publicUrl = bucket.getPublicUrl(fileName);
@@ -132,6 +134,15 @@ class FamilyMemberService {
 
   Future<void> updateFamily(String familyId, Map<String, dynamic> data) async {
     await _client.from('family_members').update(data).eq('id', familyId);
+  }
+
+  Future<List<Map<String, dynamic>>> getFamiliesByDoctor(String doctorId) async {
+    final response = await _client
+        .from('family_members')
+        .select()
+        .eq('doctor_id', doctorId);
+
+    return (response as List).cast<Map<String, dynamic>>();
   }
 }
 

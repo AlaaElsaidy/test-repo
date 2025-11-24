@@ -1,6 +1,9 @@
+import 'package:alzcare/core/models/doctor_advice_model.dart';
 import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
+import 'package:alzcare/core/supabase/doctor-advice-service.dart';
 import 'package:alzcare/core/supabase/patient-family-service.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../../theme/app_theme.dart';
@@ -22,6 +25,33 @@ class FamilyDashboard extends StatelessWidget {
       return await service.getPatientsByFamily(familyUid);
     } catch (e) {
       return [];
+    }
+  }
+
+  Future<List<DoctorAdviceModel>> _loadDoctorAdvice() async {
+    final familyId =
+        SharedPrefsHelper.getString("familyUid") ?? SharedPrefsHelper.getString("userId");
+    if (familyId == null) return [];
+    try {
+      return await DoctorAdviceService().getAdviceForFamily(familyId);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _openAdviceVideo(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid video link')),
+      );
+      return;
+    }
+
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open video')),
+      );
     }
   }
 
@@ -287,6 +317,141 @@ class FamilyDashboard extends StatelessWidget {
                                       backgroundColor: AppTheme.teal50,
                                     )
                                   : null,
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            Card(
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.cyan500,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.psychology,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Doctor Advice',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.teal900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    FutureBuilder<List<DoctorAdviceModel>>(
+                      future: _loadDoctorAdvice(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+
+                        if (snapshot.hasError) {
+                          return const Text(
+                            'Could not load advice right now.',
+                            style: TextStyle(color: Colors.red),
+                          );
+                        }
+
+                        final advices = snapshot.data ?? [];
+                        if (advices.isEmpty) {
+                          return const Text(
+                            'No advice shared yet. Your doctor can send tips and videos here.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.gray500,
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          children: advices.take(5).map((advice) {
+                            final tips = advice.tips.isNotEmpty
+                                ? advice.tips.take(2).join('\n• ')
+                                : 'No text tips';
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.teal50,
+                                          borderRadius: BorderRadius.circular(999),
+                                        ),
+                                        child: Text(
+                                          advice.status,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.teal600,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Icon(Icons.access_time,
+                                          size: 14, color: AppTheme.gray500),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        advice.createdAt
+                                            .toLocal()
+                                            .toString()
+                                            .split('.')
+                                            .first,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.gray500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '• $tips',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      height: 1.4,
+                                      color: AppTheme.gray600,
+                                    ),
+                                  ),
+                                  if (advice.videoUrl != null) ...[
+                                    const SizedBox(height: 6),
+                                    TextButton.icon(
+                                      onPressed: () =>
+                                          _openAdviceVideo(context, advice.videoUrl!),
+                                      icon: const Icon(Icons.play_circle),
+                                      label: const Text('Watch video'),
+                                    ),
+                                  ],
+                                  const Divider(),
+                                ],
+                              ),
                             );
                           }).toList(),
                         );
