@@ -2,6 +2,8 @@ import 'package:alzcare/core/models/doctor_advice_model.dart';
 import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
 import 'package:alzcare/core/supabase/doctor-advice-service.dart';
 import 'package:alzcare/core/supabase/patient-family-service.dart';
+import 'package:alzcare/core/supabase/supabase-config.dart';
+import 'package:alzcare/core/supabase/supabase-service.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
@@ -10,6 +12,57 @@ import '../../theme/app_theme.dart';
 
 class FamilyDashboard extends StatelessWidget {
   const FamilyDashboard({super.key});
+
+  Future<Map<String, dynamic>?> _loadUserInfo() async {
+    try {
+      final userId = SharedPrefsHelper.getString("userId") ?? 
+                     SharedPrefsHelper.getString("familyUid");
+      if (userId == null) return null;
+      final service = UserService();
+      return await service.getUser(userId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _loadFamilyMemberInfo() async {
+    try {
+      final familyUid = SharedPrefsHelper.getString("familyUid") ?? 
+                        SharedPrefsHelper.getString("userId");
+      if (familyUid == null) return null;
+      final client = SupabaseConfig.client;
+      
+      // Get family member with doctor_id
+      final familyResponse = await client
+          .from('family_members')
+          .select('doctor_id')
+          .eq('id', familyUid)
+          .maybeSingle();
+      
+      if (familyResponse == null || familyResponse['doctor_id'] == null) {
+        return null;
+      }
+      
+      final doctorId = familyResponse['doctor_id'] as String;
+      
+      // Get doctor info from users table (doctor_id refers to users.id)
+      final doctorResponse = await client
+          .from('users')
+          .select('id, name, phone, email')
+          .eq('id', doctorId)
+          .maybeSingle();
+      
+      if (doctorResponse == null) return null;
+      
+      return {
+        'doctor_id': doctorId,
+        'doctor': doctorResponse,
+      };
+    } catch (e) {
+      debugPrint('Error loading family member info: $e');
+      return null;
+    }
+  }
 
   Future<List<Map<String, dynamic>>> _loadLinkedPatients() async {
     try {
@@ -57,22 +110,6 @@ class FamilyDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // قائمة فيديوهات: نفس الفيديو مكرر 3 مرات
-    final videoTips = const [
-      VideoTip(
-        title: 'نصائح للتعامل مع الزهايمر (1)',
-        youtubeId: 'rfYW0Ih7J5Q',
-      ),
-      VideoTip(
-        title: 'نصائح للتعامل مع الزهايمر (2)',
-        youtubeId: 'rfYW0Ih7J5Q',
-      ),
-      VideoTip(
-        title: 'نصائح للتعامل مع الزهايمر (3)',
-        youtubeId: 'rfYW0Ih7J5Q',
-      ),
-    ];
-
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -80,137 +117,170 @@ class FamilyDashboard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header (Home)
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: AppTheme.tealGradient,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(
-                          Icons.favorite,
-                          color: Colors.white,
-                          size: 32,
-                        ),
+            FutureBuilder<Map<String, dynamic>?>(
+              future: _loadUserInfo(),
+              builder: (context, userSnapshot) {
+                return FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _loadLinkedPatients(),
+                  builder: (context, patientsSnapshot) {
+                    final userName = userSnapshot.data?['name'] as String? ?? 'User';
+                    final patients = patientsSnapshot.data ?? [];
+                    final firstPatient = patients.isNotEmpty 
+                        ? patients.first['patients'] as Map<String, dynamic>?
+                        : null;
+                    final patientName = firstPatient?['name'] as String?;
+                    
+                    return Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.tealGradient,
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Hello, Emily',
-                              style: TextStyle(
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 64,
+                                height: 64,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Icon(
+                                  Icons.favorite,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Hello, $userName',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      patientName != null
+                                          ? 'Caring for $patientName'
+                                          : 'No patients linked yet',
+                                      style: const TextStyle(
+                                        color: Color(0xFFCFFAFE),
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () {},
+                                icon: const Icon(Icons.notifications_outlined),
                                 color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                                iconSize: 28,
                               ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Caring for Margaret Smith',
-                              style: TextStyle(
-                                color: Color(0xFFCFFAFE),
-                                fontSize: 16,
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: const BoxDecoration(
+                                  color: Colors.green,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Everything is going well today',
+                                style: TextStyle(
+                                  color: Color(0xFFCFFAFE),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        onPressed: () {},
-                        icon: const Icon(Icons.notifications_outlined),
-                        color: Colors.white,
-                        iconSize: 28,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: const BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Everything is going well today',
-                        style: TextStyle(
-                          color: Color(0xFFCFFAFE),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    );
+                  },
+                );
+              },
             ),
             const SizedBox(height: 16),
 
             // Caregiver Tips (text tip)
-            Card(
-              color: AppTheme.teal50,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+            FutureBuilder<List<DoctorAdviceModel>>(
+              future: _loadDoctorAdvice(),
+              builder: (context, snapshot) {
+                String tipText = 'Maintain a consistent daily routine to help your loved one feel more secure and comfortable.';
+                
+                if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                  final latestAdvice = snapshot.data!.first;
+                  if (latestAdvice.tips.isNotEmpty) {
+                    tipText = latestAdvice.tips.first;
+                  }
+                }
+                
+                return Card(
+                  color: AppTheme.teal50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.teal500,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.lightbulb,
-                            color: Colors.white,
-                            size: 20,
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppTheme.teal500,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.lightbulb,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Tip of the Day',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.teal900,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          tipText,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.teal900,
+                            height: 1.5,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'Tip of the Day',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.teal900,
-                          ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () {},
+                          child: const Text('Read More Tips'),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Maintain a consistent daily routine to help your loved one feel more secure and comfortable.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppTheme.teal900,
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text('Read More Tips'),
-                    ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 16),
 
@@ -463,75 +533,139 @@ class FamilyDashboard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Video Tips section
-            VideoTipsSection(
-              videos: videoTips,
-              onOpen: (tip) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => VideoTipPlayerScreen(tip: tip),
-                  ),
+            // Video Tips section - Show videos from doctor advice
+            FutureBuilder<List<DoctorAdviceModel>>(
+              future: _loadDoctorAdvice(),
+              builder: (context, snapshot) {
+                final advices = snapshot.data ?? [];
+                final videoTips = <VideoTip>[];
+                
+                // Extract video URLs from doctor advice
+                for (var advice in advices) {
+                  if (advice.videoUrl != null && advice.videoUrl!.isNotEmpty) {
+                    // Try to extract YouTube ID from URL if it's a YouTube link
+                    String? youtubeId;
+                    final uri = Uri.tryParse(advice.videoUrl!);
+                    if (uri != null) {
+                      if (uri.host.contains('youtube.com') || uri.host.contains('youtu.be')) {
+                        youtubeId = uri.queryParameters['v'] ?? 
+                                   uri.pathSegments.last;
+                      }
+                    }
+                    
+                    if (youtubeId != null && youtubeId.isNotEmpty) {
+                      videoTips.add(VideoTip(
+                        title: advice.title ?? 'Doctor Advice Video',
+                        youtubeId: youtubeId,
+                      ));
+                    }
+                  }
+                }
+                
+                // If no videos from advice, show empty state or remove section
+                if (videoTips.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                
+                return VideoTipsSection(
+                  videos: videoTips,
+                  onOpen: (tip) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VideoTipPlayerScreen(tip: tip),
+                      ),
+                    );
+                  },
                 );
               },
             ),
             const SizedBox(height: 16),
 
             // Emergency Contact
-            Card(
-              color: Colors.red[50],
-              child: InkWell(
-                onTap: () {},
-                borderRadius: BorderRadius.circular(16),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.emergency,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Emergency Contact',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red,
-                              ),
+            FutureBuilder<Map<String, dynamic>?>(
+              future: _loadFamilyMemberInfo(),
+              builder: (context, snapshot) {
+                String doctorName = 'Doctor';
+                String? doctorPhone;
+                
+                if (snapshot.hasData && snapshot.data != null) {
+                  final doctor = snapshot.data!['doctor'] as Map<String, dynamic>?;
+                  if (doctor != null) {
+                    doctorName = doctor['name'] as String? ?? 'Doctor';
+                    doctorPhone = doctor['phone'] as String?;
+                  }
+                }
+                
+                return Card(
+                  color: Colors.red[50],
+                  child: InkWell(
+                    onTap: doctorPhone != null
+                        ? () async {
+                            final uri = Uri.parse('tel:$doctorPhone');
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Could not make phone call')),
+                              );
+                            }
+                          }
+                        : null,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Tap to call Dr. Johnson',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.red,
-                              ),
+                            child: const Icon(
+                              Icons.emergency,
+                              color: Colors.white,
+                              size: 24,
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Emergency Contact',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  doctorPhone != null
+                                      ? 'Tap to call $doctorName'
+                                      : 'No doctor assigned',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.phone,
+                            color: Colors.red,
+                          ),
+                        ],
                       ),
-                      const Icon(
-                        Icons.phone,
-                        color: Colors.red,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ],
         ),
