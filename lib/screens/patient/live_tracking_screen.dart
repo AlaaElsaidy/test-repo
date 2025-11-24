@@ -6,6 +6,10 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/shared-prefrences/shared-prefrences-helper.dart';
+import '../../core/supabase/location-tracking-service.dart';
+import '../../core/supabase/safe-zone-service.dart';
+import '../../core/supabase/supabase-service.dart';
 import '../../theme/app_theme.dart';
 
 class LiveTrackingScreen extends StatefulWidget {
@@ -20,25 +24,62 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   Position? _pos;
   DateTime? _lastUpdated;
   String? _address;
+  String? _emergencyPhone;
+  String? _patientId;
 
-  // Safe Zones (example – adjust as you like)
-  final List<_SafeZone> _safeZones = const [
-    _SafeZone(
-      name: 'Home',
-      lat: 31.034350,
-      lng: 30.471819,
-      radiusMeters: 20,
-      isActive: true,
-    ),
-  ];
+  final LocationTrackingService _locationService = LocationTrackingService();
+  final SafeZoneService _safeZoneService = SafeZoneService();
+  final PatientService _patientService = PatientService();
 
-  // Emergency phone (edit as needed) — يمكن ترك + هنا، هنحوله digits في دالة واتساب
-  final String _emergencyPhone = '+201210402952';
+  // Safe Zones from database
+  List<SafeZone> _safeZones = [];
 
   @override
   void initState() {
     super.initState();
+    _initData();
+  }
+
+  Future<void> _initData() async {
+    final userId = SharedPrefsHelper.getString("userId") ?? 
+                   SharedPrefsHelper.getString("patientUid");
+    if (userId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User ID not found')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _patientId = userId);
+
+    // Get patient record and emergency phone
+    final patient = await _patientService.getPatientByUserId(userId);
+    if (patient != null) {
+      setState(() {
+        _emergencyPhone = patient['phone_emergency'] as String?;
+      });
+    }
+
+    // Load safe zones
+    await _loadSafeZones();
+
+    // Get current location
     _getCurrentLocation();
+  }
+
+  Future<void> _loadSafeZones() async {
+    if (_patientId == null) return;
+
+    try {
+      final zones = await _safeZoneService.getSafeZonesByPatient(_patientId!);
+      setState(() {
+        _safeZones = zones;
+      });
+    } catch (e) {
+      debugPrint('Failed to load safe zones: $e');
+    }
   }
 
   // Permissions + current location
@@ -93,6 +134,30 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         }
       } catch (_) {
         addr = null;
+      }
+
+      // Save location to database
+      if (_patientId != null) {
+        try {
+          await _locationService.saveLocation(
+            patientId: _patientId!,
+            latitude: position.latitude,
+            longitude: position.longitude,
+            address: addr,
+          );
+          debugPrint('Location saved successfully to database');
+        } catch (e) {
+          debugPrint('Failed to save location: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to save location: $e'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
       }
 
       setState(() {
@@ -171,6 +236,15 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
 
   // Emergency: try WhatsApp first; fallback to SMS (then call inside _openSMS if needed)
   Future<void> _sendEmergencyAlert() async {
+    if (_emergencyPhone == null || _emergencyPhone!.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Emergency contact not configured')),
+        );
+      }
+      return;
+    }
+
     if (_pos == null) {
       await _getCurrentLocation();
     }
@@ -183,13 +257,13 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
 
     bool openedWhatsApp = false;
     try {
-      openedWhatsApp = await _openWhatsApp(_emergencyPhone, msg);
+      openedWhatsApp = await _openWhatsApp(_emergencyPhone!, msg);
     } catch (_) {
       openedWhatsApp = false;
     }
 
     if (!openedWhatsApp) {
-      await _openSMS(_emergencyPhone, msg);
+      await _openSMS(_emergencyPhone!, msg);
     }
 
     if (mounted) {
@@ -231,7 +305,12 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     if (_pos == null) return true; // until first fix, treat as safe
     for (final z in _safeZones) {
       if (!z.isActive) continue;
-      final d = _distanceMeters(_pos!.latitude, _pos!.longitude, z.lat, z.lng);
+      final d = _distanceMeters(
+        _pos!.latitude,
+        _pos!.longitude,
+        z.latitude,
+        z.longitude,
+      );
       if (d <= z.radiusMeters) return true;
     }
     return false;
@@ -536,7 +615,10 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                               ),
                               const SizedBox(width: 12),
                               OutlinedButton.icon(
-                                onPressed: () => _callNumber(_emergencyPhone),
+                                onPressed: _emergencyPhone != null &&
+                                        _emergencyPhone!.isNotEmpty
+                                    ? () => _callNumber(_emergencyPhone!)
+                                    : null,
                                 icon: const Icon(Icons.call),
                                 label: const Text('Call'),
                                 style: OutlinedButton.styleFrom(
@@ -565,18 +647,4 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   }
 }
 
-// Models
-class _SafeZone {
-  final String name;
-  final double lat;
-  final double lng;
-  final double radiusMeters;
-  final bool isActive;
-  const _SafeZone({
-    required this.name,
-    required this.lat,
-    required this.lng,
-    required this.radiusMeters,
-    required this.isActive,
-  });
-}
+// Note: SafeZone model is now in safe-zone-service.dart

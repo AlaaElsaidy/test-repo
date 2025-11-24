@@ -150,11 +150,10 @@ class InvitationRepo {
       // patient_family_relations and email/phone).
       final invitationId = invitation.id;
       if (invitationId != null) {
-        final idForInvitation = patientRecordId ?? patientUserId;
         try {
           await SupabaseConfig.client
               .from('invitations')
-              .update({'patient_id': idForInvitation})
+              .update({'patient_id': patientRecordId})
               .eq('id', invitationId);
         } catch (e) {
           // Log a warning but don't fail the flow
@@ -244,11 +243,13 @@ class InvitationRepo {
         return const Left('Invitation not found');
       }
 
-      if (invitation.status != 'pending') {
-        return Left('Invitation is already ${invitation.status}');
+      // Allow accepting even if already accepted (for re-linking or navigation)
+      // Only block if rejected or expired
+      if (invitation.status == 'rejected') {
+        return const Left('Invitation has been rejected');
       }
 
-      if (invitation.isExpired) {
+      if (invitation.isExpired && invitation.status != 'accepted') {
         return const Left('Invitation has expired');
       }
 

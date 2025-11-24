@@ -5,6 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/shared-prefrences/shared-prefrences-helper.dart';
+import '../../core/supabase/location-tracking-service.dart';
+import '../../core/supabase/patient-family-service.dart';
+import '../../core/supabase/safe-zone-service.dart';
 import '../../theme/app_theme.dart';
 
 class FamilyTrackingScreen extends StatefulWidget {
@@ -17,91 +21,196 @@ class FamilyTrackingScreen extends StatefulWidget {
 class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
   int _selectedTab = 0; // 0: Live, 1: Safe Zones (Editor), 2: History
 
-  final String _patientName = 'Margaret Smith';
+  // Services
+  final LocationTrackingService _locationService = LocationTrackingService();
+  final SafeZoneService _safeZoneService = SafeZoneService();
+  final PatientFamilyService _patientFamilyService = PatientFamilyService();
 
-  // Patient location (updated)
-  _LatLng _patient = const _LatLng(31.041243, 30.465516);
-  DateTime _lastUpdated = DateTime.now();
+  // Patient data
+  String? _patientName;
+  String? _selectedPatientUserId;
+  String? _selectedPatientRecordId;
+  _LatLng? _patient;
+  DateTime? _lastUpdated;
+  String? _patientAddress;
+  bool _loadingLocation = false;
 
-  // Safe zones data (Home updated)
-  final List<_SafeZone> _safeZones = [
-    _SafeZone(
-      name: 'Home',
-      address: '123 mostashfa Street, damanhour',
-      lat: 31.041243,
-      lng: 30.465516,
-      radiusMeters: 200,
-      isActive: true,
-    ),
-    _SafeZone(
-      name: 'Park',
-      address: 'Central Park, Springfield',
-      lat: 37.3333,
-      lng: -122.0293,
-      radiusMeters: 150,
-      isActive: true,
-    ),
-    _SafeZone(
-      name: 'Hospital',
-      address: 'Springfield General Hospital',
-      lat: 37.3270,
-      lng: -122.0305,
-      radiusMeters: 100,
-      isActive: true,
-    ),
-    _SafeZone(
-      name: 'Church',
-      address: 'Community Church, Springfield',
-      lat: 37.3345,
-      lng: -122.0350,
-      radiusMeters: 100,
-      isActive: false,
-    ),
-  ];
+  // Patients list
+  List<Map<String, dynamic>> _patients = [];
 
-  // History data (first entry updated to Home new location)
-  final List<_HistoryEntry> _history = [
-    _HistoryEntry(
-      place: 'Home',
-      address: '123 mostashfa Street, damanhour',
-      timeLabel: '2 mins ago',
-      durationLabel: 'Current location',
-      icon: Icons.home,
-      color: Colors.green,
-      lat: 31.041243,
-      lng: 30.465516,
-    ),
-    _HistoryEntry(
-      place: 'Park',
-      address: 'Central Park, Springfield',
-      timeLabel: '2 hours ago',
-      durationLabel: '45 minutes',
-      icon: Icons.park,
-      color: AppTheme.teal500,
-      lat: 37.3333,
-      lng: -122.0293,
-    ),
-    _HistoryEntry(
-      place: 'Hospital',
-      address: 'Springfield General Hospital',
-      timeLabel: 'Yesterday',
-      durationLabel: '2 hours',
-      icon: Icons.local_hospital,
-      color: Colors.red,
-      lat: 37.3270,
-      lng: -122.0305,
-    ),
-    _HistoryEntry(
-      place: 'Shopping Center',
-      address: 'Main Street Mall',
-      timeLabel: '2 days ago',
-      durationLabel: '1 hour',
-      icon: Icons.shopping_bag,
-      color: AppTheme.cyan500,
-      lat: 37.3298,
-      lng: -122.0330,
-    ),
-  ];
+  // Safe zones data
+  List<SafeZone> _safeZones = [];
+  bool _loadingZones = false;
+
+  // History data
+  List<Map<String, dynamic>> _history = [];
+  bool _loadingHistory = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initData();
+  }
+
+  Future<void> _initData() async {
+    await _loadPatients();
+  }
+
+  Future<void> _loadPatients() async {
+    try {
+      final familyUid = SharedPrefsHelper.getString("familyUid") ??
+          SharedPrefsHelper.getString("userId");
+      if (familyUid == null) {
+        return;
+      }
+
+      final patients = await _patientFamilyService.getPatientsByFamily(familyUid);
+      setState(() {
+        _patients = patients;
+      });
+
+      // Select first patient if available
+      if (patients.isNotEmpty) {
+        final firstPatient = patients.first['patients'] as Map<String, dynamic>?;
+        if (firstPatient != null) {
+          final userId = firstPatient['user_id'] as String?;
+          final recordId = firstPatient['id'] as String?;
+          final name = firstPatient['name'] as String? ?? 'Patient';
+          
+          debugPrint('Selecting patient - userId: $userId, recordId: $recordId, name: $name');
+          
+          if (userId != null && recordId != null) {
+            await _selectPatient(userId, recordId, name);
+          } else {
+            debugPrint('Warning: Patient data incomplete - userId: $userId, recordId: $recordId');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load patients: $e');
+    }
+  }
+
+  Future<void> _selectPatient(
+    String? userId,
+    String? recordId,
+    String? name,
+  ) async {
+    if (userId == null || recordId == null) return;
+
+    setState(() {
+      _selectedPatientUserId = userId;
+      _selectedPatientRecordId = recordId;
+      _patientName = name;
+      _patient = null;
+      _lastUpdated = null;
+      _patientAddress = null;
+    });
+
+    await Future.wait([
+      _loadLocation(),
+      _loadSafeZones(),
+      _loadHistory(),
+    ]);
+  }
+
+  Future<void> _loadLocation() async {
+    if (_selectedPatientRecordId == null) {
+      debugPrint('Cannot load location: _selectedPatientRecordId is null');
+      return;
+    }
+
+    setState(() => _loadingLocation = true);
+    try {
+      debugPrint('Loading location for patient record ID: $_selectedPatientRecordId');
+      final location = await _locationService
+          .getLocationByPatientRecordId(_selectedPatientRecordId!);
+      
+      if (location != null && location['latitude'] != null) {
+        debugPrint('Location loaded: ${location['latitude']}, ${location['longitude']}');
+        setState(() {
+          _patient = _LatLng(
+            location['latitude'] as double,
+            location['longitude'] as double,
+          );
+          _patientAddress = location['address'] as String?;
+          if (location['updated_at'] != null) {
+            _lastUpdated = DateTime.parse(location['updated_at'] as String);
+          } else {
+            _lastUpdated = DateTime.now();
+          }
+          _loadingLocation = false;
+        });
+      } else {
+        debugPrint('No location data found for patient');
+        setState(() => _loadingLocation = false);
+      }
+    } catch (e) {
+      debugPrint('Failed to load location: $e');
+      setState(() => _loadingLocation = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load location: $e'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadSafeZones() async {
+    if (_selectedPatientRecordId == null) return;
+
+    setState(() => _loadingZones = true);
+    try {
+      final zones = await _safeZoneService
+          .getSafeZonesByPatientRecordId(_selectedPatientRecordId!);
+      setState(() {
+        _safeZones = zones;
+        _loadingZones = false;
+      });
+    } catch (e) {
+      debugPrint('Failed to load safe zones: $e');
+      setState(() => _loadingZones = false);
+    }
+  }
+
+  Future<void> _loadHistory() async {
+    if (_selectedPatientUserId == null) {
+      debugPrint('Cannot load history: _selectedPatientUserId is null');
+      return;
+    }
+
+    setState(() => _loadingHistory = true);
+    try {
+      debugPrint('Loading history for patient user ID: $_selectedPatientUserId');
+      final history = await _locationService.getLocationHistory(
+        patientId: _selectedPatientUserId!,
+        limit: 50,
+      );
+      debugPrint('History loaded: ${history.length} entries');
+      setState(() {
+        _history = history;
+        _loadingHistory = false;
+      });
+    } catch (e) {
+      debugPrint('Failed to load history: $e');
+      setState(() => _loadingHistory = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load history: $e'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  // Note: History is now loaded from database
 
   // Distance in meters using Haversine
   double _distanceMeters(_LatLng a, _LatLng b) {
@@ -116,13 +225,16 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
 
   double _deg2rad(double deg) => deg * pi / 180.0;
 
-  bool _isInsideZone(_SafeZone z) {
-    if (!z.isActive) return false;
-    final d = _distanceMeters(_patient, _LatLng(z.lat, z.lng));
+  bool _isInsideZone(SafeZone z) {
+    if (!z.isActive || _patient == null) return false;
+    final d = _distanceMeters(_patient!, _LatLng(z.latitude, z.longitude));
     return d <= z.radiusMeters;
   }
 
-  bool get _isInsideAnyActiveZone => _safeZones.any(_isInsideZone);
+  bool get _isInsideAnyActiveZone {
+    if (_patient == null) return false;
+    return _safeZones.any(_isInsideZone);
+  }
 
   String _timeAgo(DateTime t) {
     final d = DateTime.now().difference(t);
@@ -132,15 +244,8 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
     return '${d.inDays} day${d.inDays > 1 ? 's' : ''} ago';
   }
 
-  void _refreshLocation() {
-    // simulate small move
-    final r = Random();
-    final deltaLat = (r.nextDouble() - 0.5) / 5000; // tiny move
-    final deltaLng = (r.nextDouble() - 0.5) / 5000;
-    setState(() {
-      _patient = _LatLng(_patient.lat + deltaLat, _patient.lng + deltaLng);
-      _lastUpdated = DateTime.now();
-    });
+  Future<void> _refreshLocation() async {
+    await _loadLocation();
   }
 
   Future<void> _openMapsTo({
@@ -221,10 +326,10 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
   }) {
     final nameCtrl = TextEditingController(text: 'New Zone');
     final addrCtrl = TextEditingController(text: '');
-    final latCtrl =
-        TextEditingController(text: _patient.lat.toStringAsFixed(6));
-    final lngCtrl =
-        TextEditingController(text: _patient.lng.toStringAsFixed(6));
+    final latCtrl = TextEditingController(
+        text: _patient?.lat.toStringAsFixed(6) ?? '0.0');
+    final lngCtrl = TextEditingController(
+        text: _patient?.lng.toStringAsFixed(6) ?? '0.0');
     double radius = 150;
     bool isActive = true;
 
@@ -273,16 +378,17 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          ActionChip(
-                            label: const Text('Use patient location'),
-                            avatar:
-                                const Icon(Icons.person_pin_circle, size: 18),
-                            onPressed: () => useCoords(
-                              _patient.lat,
-                              _patient.lng,
-                              name: 'Patient Location',
+                          if (_patient != null)
+                            ActionChip(
+                              label: const Text('Use patient location'),
+                              avatar:
+                                  const Icon(Icons.person_pin_circle, size: 18),
+                              onPressed: () => useCoords(
+                                _patient!.lat,
+                                _patient!.lng,
+                                name: 'Patient Location',
+                              ),
                             ),
-                          ),
                           ActionChip(
                             label: const Text('Use my current location'),
                             avatar: const Icon(Icons.my_location, size: 18),
@@ -295,11 +401,16 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                             },
                           ),
                           ..._history.take(3).map((h) {
+                            final lat = h['latitude'] as double?;
+                            final lng = h['longitude'] as double?;
+                            final address = h['address'] as String?;
+                            if (lat == null || lng == null) return const SizedBox();
                             return ActionChip(
-                              label: Text(h.place),
+                              label: Text(address?.split(',').first ?? 'Location'),
                               avatar: const Icon(Icons.place, size: 18),
-                              onPressed: () => useCoords(h.lat, h.lng,
-                                  name: h.place, address: h.address),
+                              onPressed: () => useCoords(lat, lng,
+                                  name: address?.split(',').first ?? 'Location',
+                                  address: address),
                             );
                           }),
                         ],
@@ -506,7 +617,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                             ),
                           ),
                           Text(
-                            _patientName,
+                            _patientName ?? 'Select Patient',
                             style: const TextStyle(
                               color: Color(0xFFCFFAFE),
                               fontSize: 14,
@@ -522,6 +633,47 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+
+                // Patient selector (if multiple patients)
+                if (_patients.length > 1) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: DropdownButton<String>(
+                      value: _selectedPatientRecordId,
+                      isExpanded: true,
+                      dropdownColor: AppTheme.teal600,
+                      style: const TextStyle(color: Colors.white),
+                      underline: const SizedBox(),
+                      items: _patients.map((p) {
+                        final patient = p['patients'] as Map<String, dynamic>?;
+                        final recordId = patient?['id'] as String?;
+                        final name = patient?['name'] as String? ?? 'Patient';
+                        return DropdownMenuItem<String>(
+                          value: recordId,
+                          child: Text(name),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        final patient = _patients.firstWhere(
+                          (p) => (p['patients'] as Map<String, dynamic>?)?['id'] == value,
+                        );
+                        final patientData = patient['patients'] as Map<String, dynamic>?;
+                        _selectPatient(
+                          patientData?['user_id'] as String? ?? value,
+                          value,
+                          patientData?['name'] as String? ?? 'Patient',
+                        );
+                      },
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 // Tabs
@@ -567,75 +719,167 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
           // Content
           Expanded(
             child: _selectedTab == 0
-                ? _LiveTrackingView(
-                    isInsideAny: _isInsideAnyActiveZone,
-                    statusText:
-                        _isInsideAnyActiveZone ? 'Safe Zone' : 'Outside Zone',
-                    statusColor:
-                        _isInsideAnyActiveZone ? Colors.green : Colors.red,
-                    // Live address updated:
-                    address: '123 mostashfa Street, damanhour',
-                    lastUpdatedLabel: _timeAgo(_lastUpdated),
-                    onRefresh: _refreshLocation,
-                    onDirections: () => _openMapsTo(
-                      lat: _patient.lat,
-                      lng: _patient.lng,
-                      label: '$_patientName location',
-                    ),
-                  )
-                : _selectedTab == 1
-                    // Editor directly (like Doctor screen)
-                    ? _SafeZonesEditorView(
-                        patientName: _patientName,
-                        zones: _safeZones,
-                        isInside: _isInsideZone,
-                        onToggle: (i, val) {
-                          setState(() {
-                            _safeZones[i] =
-                                _safeZones[i].copyWith(isActive: val);
-                          });
-                        },
-                        onDelete: (i) async {
-                          final z = _safeZones[i];
-                          final confirmed = await showDialog<bool>(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  title: const Text('Delete Safe Zone'),
-                                  content: Text(
-                                      'Are you sure you want to delete "${z.name}"?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, true),
-                                      child: const Text('Delete',
-                                          style: TextStyle(color: Colors.red)),
-                                    ),
-                                  ],
-                                ),
-                              ) ??
-                              false;
-                          if (confirmed) {
-                            setState(() {
-                              _safeZones.removeAt(i);
-                            });
-                          }
-                        },
-                        onAddPressed: () => _openAddSafeZoneSheet(
-                          onAdd: (newZone) {
-                            setState(() => _safeZones.add(newZone));
-                          },
+                ? _patient == null
+                    ? Center(
+                        child: _loadingLocation
+                            ? const CircularProgressIndicator()
+                            : const Text('No location data available'),
+                      )
+                    : _LiveTrackingView(
+                        isInsideAny: _isInsideAnyActiveZone,
+                        statusText: _isInsideAnyActiveZone
+                            ? 'Safe Zone'
+                            : 'Outside Zone',
+                        statusColor: _isInsideAnyActiveZone
+                            ? Colors.green
+                            : Colors.red,
+                        address: _patientAddress ??
+                            '${_patient!.lat.toStringAsFixed(6)}, ${_patient!.lng.toStringAsFixed(6)}',
+                        lastUpdatedLabel: _lastUpdated != null
+                            ? _timeAgo(_lastUpdated!)
+                            : 'Unknown',
+                        onRefresh: _refreshLocation,
+                        onDirections: () => _openMapsTo(
+                          lat: _patient!.lat,
+                          lng: _patient!.lng,
+                          label: '${_patientName ?? "Patient"} location',
                         ),
                       )
-                    : _HistoryView(
-                        entries: _history,
-                        onOpenMap: (lat, lng, label) =>
-                            _openMapsTo(lat: lat, lng: lng, label: label),
-                      ),
+                : _selectedTab == 1
+                    // Editor directly (like Doctor screen)
+                    ? _loadingZones
+                        ? const Center(child: CircularProgressIndicator())
+                        : _SafeZonesEditorView(
+                            patientName: _patientName ?? 'Patient',
+                            zones: _safeZones,
+                            isInside: _isInsideZone,
+                            onToggle: (i, val) async {
+                              try {
+                                final zone = _safeZones[i];
+                                if (zone.id != null) {
+                                  await _safeZoneService.toggleSafeZone(
+                                    zone.id!,
+                                    val,
+                                  );
+                                  await _loadSafeZones();
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Failed to update: $e')),
+                                  );
+                                }
+                              }
+                            },
+                            onDelete: (i) async {
+                              final z = _safeZones[i];
+                              final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      title: const Text('Delete Safe Zone'),
+                                      content: Text(
+                                          'Are you sure you want to delete "${z.name}"?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: const Text('Delete',
+                                              style: TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  ) ??
+                                  false;
+                              if (confirmed && z.id != null) {
+                                try {
+                                  await _safeZoneService.deleteSafeZone(z.id!);
+                                  await _loadSafeZones();
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Failed to delete: $e')),
+                                    );
+                                  }
+                                }
+                              }
+                            },
+                            onAddPressed: () => _openAddSafeZoneSheet(
+                              onAdd: (newZone) async {
+                                if (_selectedPatientUserId == null) return;
+                                try {
+                                  await _safeZoneService.createSafeZone(
+                                    patientUserId: _selectedPatientUserId!,
+                                    name: newZone.name,
+                                    address: newZone.address,
+                                    latitude: newZone.lat,
+                                    longitude: newZone.lng,
+                                    radiusMeters: newZone.radiusMeters.toInt(),
+                                    isActive: newZone.isActive,
+                                  );
+                                  await _loadSafeZones();
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Failed to add: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          )
+                    : _loadingHistory
+                        ? const Center(child: CircularProgressIndicator())
+                        : _history.isEmpty
+                            ? const Center(
+                                child: Text('No location history available'),
+                              )
+                            : _HistoryView(
+                                entries: _history.map((h) {
+                                  final lat = h['latitude'] as double?;
+                                  final lng = h['longitude'] as double?;
+                                  final address = h['address'] as String?;
+                                  final createdAt = h['created_at'] != null
+                                      ? DateTime.parse(h['created_at'] as String)
+                                      : DateTime.now();
+                                  
+                                  // Determine place name from address or coordinates
+                                  String place = 'Unknown';
+                                  IconData icon = Icons.place;
+                                  Color color = AppTheme.teal500;
+                                  
+                                  if (address != null && address.isNotEmpty) {
+                                    place = address.split(',').first;
+                                    if (address.toLowerCase().contains('home')) {
+                                      icon = Icons.home;
+                                      color = Colors.green;
+                                    } else if (address.toLowerCase().contains('hospital')) {
+                                      icon = Icons.local_hospital;
+                                      color = Colors.red;
+                                    } else if (address.toLowerCase().contains('park')) {
+                                      icon = Icons.park;
+                                      color = AppTheme.teal500;
+                                    }
+                                  }
+
+                                  return _HistoryEntry(
+                                    place: place,
+                                    address: address ?? 'No address',
+                                    timeLabel: _timeAgo(createdAt),
+                                    durationLabel: '—',
+                                    icon: icon,
+                                    color: color,
+                                    lat: lat ?? 0.0,
+                                    lng: lng ?? 0.0,
+                                  );
+                                }).toList(),
+                                onOpenMap: (lat, lng, label) =>
+                                    _openMapsTo(lat: lat, lng: lng, label: label),
+                              ),
           ),
         ],
       ),
@@ -954,8 +1198,8 @@ class _LiveTrackingView extends StatelessWidget {
 // Editor view (like Doctor screen)
 class _SafeZonesEditorView extends StatelessWidget {
   final String patientName;
-  final List<_SafeZone> zones;
-  final bool Function(_SafeZone) isInside;
+  final List<SafeZone> zones;
+  final bool Function(SafeZone) isInside;
   final void Function(int index, bool value) onToggle;
   final void Function(int index) onDelete;
   final VoidCallback onAddPressed;
@@ -985,22 +1229,33 @@ class _SafeZonesEditorView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          ...List.generate(zones.length, (i) {
-            final z = zones[i];
-            final inside = isInside(z);
-            return Padding(
-              padding: EdgeInsets.only(bottom: i == zones.length - 1 ? 0 : 12),
-              child: _SafeZoneCardRow(
-                name: z.name,
-                address: z.address,
-                radius: '${z.radiusMeters.toInt()}m',
-                isActive: z.isActive,
-                isInside: inside,
-                onToggle: (val) => onToggle(i, val),
-                onDelete: () => onDelete(i),
+          if (zones.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(32.0),
+              child: Center(
+                child: Text(
+                  'No safe zones yet. Add one to get started.',
+                  style: TextStyle(color: AppTheme.gray500),
+                ),
               ),
-            );
-          }),
+            )
+          else
+            ...List.generate(zones.length, (i) {
+              final z = zones[i];
+              final inside = isInside(z);
+              return Padding(
+                padding: EdgeInsets.only(bottom: i == zones.length - 1 ? 0 : 12),
+                child: _SafeZoneCardRow(
+                  name: z.name,
+                  address: z.address ?? '—',
+                  radius: '${z.radiusMeters}m',
+                  isActive: z.isActive,
+                  isInside: inside,
+                  onToggle: (val) => onToggle(i, val),
+                  onDelete: () => onDelete(i),
+                ),
+              );
+            }),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
