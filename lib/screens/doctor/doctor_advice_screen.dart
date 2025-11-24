@@ -224,11 +224,17 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
     try {
       String? uploadedVideoUrl;
       if (_videoXFile != null) {
-        uploadedVideoUrl = await _adviceService.uploadMedia(
-          file: File(_videoXFile!.path),
-          doctorId: _doctorId!,
-          adviceId: DateTime.now().microsecondsSinceEpoch.toString(),
-        );
+        try {
+          uploadedVideoUrl = await _adviceService.uploadMedia(
+            file: File(_videoXFile!.path),
+            doctorId: _doctorId!,
+            adviceId: DateTime.now().microsecondsSinceEpoch.toString(),
+          );
+        } catch (uploadError) {
+          debugPrint('Video upload failed: $uploadError');
+          // Continue without video - save advice without video URL
+          _snack('Warning: Video upload failed, saving advice without video. Error: $uploadError');
+        }
       }
 
       final advice = await _adviceService.createAdvice(
