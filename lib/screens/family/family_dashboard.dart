@@ -5,7 +5,6 @@ import 'package:alzcare/core/supabase/patient-family-service.dart';
 import 'package:alzcare/core/supabase/supabase-config.dart';
 import 'package:alzcare/core/supabase/supabase-service.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
@@ -545,15 +544,64 @@ class _DoctorAdviceCard extends StatelessWidget {
     required this.onOpenVideo,
   });
 
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'sent':
-        return Colors.green;
-      case 'draft':
-        return Colors.orange;
-      default:
-        return AppTheme.teal600;
-    }
+  void _showAllTipsDialog(BuildContext context, DoctorAdviceModel advice) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('All Tips'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: advice.tips.asMap().entries.map((entry) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: AppTheme.teal600,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${entry.key + 1}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        entry.value,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          height: 1.5,
+                          color: AppTheme.teal900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -625,88 +673,119 @@ class _DoctorAdviceCard extends StatelessWidget {
                   );
                 }
 
-                return ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: advices.length.clamp(0, 5),
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final advice = advices[index];
-                    final color = _statusColor(advice.status);
-                    final tipsPreview = advice.tips.isNotEmpty
-                        ? advice.tips.join('\n• ')
-                        : 'No text tips';
-
-                    return Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.gray50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.gray100),
-                      ),
+                return Column(
+                  children: advices.take(5).map((advice) {
+                    final firstTip = advice.tips.isNotEmpty ? advice.tips.first : null;
+                    
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: color.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  advice.status.toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: color,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.access_time,
-                                  size: 14, color: AppTheme.gray500),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  DateFormat('yyyy-MM-dd HH:mm')
-                                      .format(advice.createdAt.toLocal()),
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppTheme.gray500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            tipsPreview,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              height: 1.5,
-                              color: AppTheme.gray600,
-                            ),
-                          ),
+                          // Video Card (if video exists)
                           if (advice.videoUrl != null &&
                               advice.videoUrl!.isNotEmpty) ...[
                             const SizedBox(height: 12),
-                            _AdviceVideoPlayer(
-                              url: advice.videoUrl!,
-                              onOpenExternally: (url) =>
-                                  onOpenVideo(context, url),
+                            _InlineVideoPlayer(
+                              videoUrl: advice.videoUrl!,
+                              thumbnailUrl: advice.thumbnailUrl,
                             ),
-                          ]
+                          ],
+
+                          // Tip Card (if tip exists)
+                          if (firstTip != null) ...[
+                            const SizedBox(height: 12),
+                            Card(
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                              elevation: 2,
+                              color: AppTheme.teal50,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.teal600,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(
+                                        Icons.lightbulb,
+                                        color: Colors.white,
+                                        size: 22,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Tip',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppTheme.teal600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            firstTip,
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              color: AppTheme.teal900,
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                          if (advice.tips.length > 1) ...[
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              '${advice.tips.length - 1} more tip${advice.tips.length > 2 ? 's' : ''}',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: AppTheme.teal600,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+
+                          // View All Tips Button (if more than one tip)
+                          if (advice.tips.length > 1) ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  _showAllTipsDialog(context, advice);
+                                },
+                                icon: const Icon(Icons.tips_and_updates),
+                                label: Text('View all ${advice.tips.length} tips'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.teal600,
+                                  side: const BorderSide(color: AppTheme.teal200),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     );
-                  },
+                  }).toList(),
                 );
               },
             ),
@@ -714,6 +793,282 @@ class _DoctorAdviceCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// Inline video player that displays video directly in the page
+class _InlineVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+  final String? thumbnailUrl;
+
+  const _InlineVideoPlayer({
+    required this.videoUrl,
+    this.thumbnailUrl,
+  });
+
+  @override
+  State<_InlineVideoPlayer> createState() => _InlineVideoPlayerState();
+}
+
+class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
+  VideoPlayerController? _controller;
+  bool _isInitialized = false;
+  bool _isPlaying = false;
+  bool _hasError = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    try {
+      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+      await _controller!.initialize();
+      _controller!.addListener(_videoListener);
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+          _isLoading = false;
+          _isPlaying = _controller!.value.isPlaying;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error initializing video: $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _videoListener() {
+    if (_controller != null && mounted) {
+      setState(() {
+        _isPlaying = _controller!.value.isPlaying;
+      });
+    }
+  }
+
+  void _togglePlayPause() {
+    if (_controller == null || !_isInitialized) return;
+    setState(() {
+      if (_controller!.value.isPlaying) {
+        _controller!.pause();
+      } else {
+        _controller!.play();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller?.removeListener(_videoListener);
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: AspectRatio(
+          aspectRatio: _isInitialized && _controller != null
+              ? _controller!.value.aspectRatio
+              : 16 / 9,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Video player or thumbnail
+              if (_isLoading)
+                Container(
+                  color: Colors.black87,
+                  child: const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                )
+              else if (_hasError)
+                Container(
+                  color: Colors.black87,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline,
+                            color: Colors.white, size: 48),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Failed to load video',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _hasError = false;
+                              _isLoading = true;
+                            });
+                            _initializeVideo();
+                          },
+                          icon: const Icon(Icons.refresh, color: Colors.white),
+                          label: const Text('Retry', style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (_isInitialized && _controller != null)
+                VideoPlayer(_controller!)
+              else
+                Container(
+                  color: Colors.black87,
+                  child: widget.thumbnailUrl != null
+                      ? Image.network(
+                          widget.thumbnailUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                        )
+                      : _buildPlaceholder(),
+                ),
+
+              // Play/Pause overlay
+              if (_isInitialized && _controller != null)
+                GestureDetector(
+                  onTap: _togglePlayPause,
+                  child: Container(
+                    color: _isPlaying ? Colors.transparent : Colors.black38,
+                    child: _isPlaying
+                        ? const SizedBox.shrink()
+                        : Center(
+                            child: Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.play_arrow,
+                                size: 40,
+                                color: AppTheme.teal600,
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+
+              // Video controls at bottom
+              if (_isInitialized && _controller != null)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.7),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        VideoProgressIndicator(
+                          _controller!,
+                          allowScrubbing: true,
+                          colors: const VideoProgressColors(
+                            playedColor: AppTheme.teal600,
+                            bufferedColor: Colors.white54,
+                            backgroundColor: Colors.white24,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          child: Row(
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  _isPlaying
+                                      ? Icons.pause_circle_filled
+                                      : Icons.play_circle_filled,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                                onPressed: _togglePlayPause,
+                              ),
+                              Expanded(
+                                child: Text(
+                                  _formatDuration(_controller!.value.position) +
+                                      ' / ' +
+                                      _formatDuration(_controller!.value.duration),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.play_arrow,
+              size: 40,
+              color: AppTheme.teal600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Tap to play video',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
   }
 }
 

@@ -32,3 +32,64 @@ CREATE TRIGGER trg_doctor_advices_updated_at
 BEFORE UPDATE ON public.doctor_advices
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+-- RLS (Row Level Security) policies
+ALTER TABLE public.doctor_advices ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Doctors can view their own advice
+CREATE POLICY "Doctors can view their own advice"
+ON public.doctor_advices
+FOR SELECT
+USING (
+    doctor_id IN (
+        SELECT id FROM public.users
+        WHERE id = auth.uid()
+    )
+);
+
+-- Policy: Doctors can insert their own advice
+CREATE POLICY "Doctors can insert their own advice"
+ON public.doctor_advices
+FOR INSERT
+WITH CHECK (
+    doctor_id IN (
+        SELECT id FROM public.users
+        WHERE id = auth.uid()
+    )
+);
+
+-- Policy: Doctors can update their own advice
+CREATE POLICY "Doctors can update their own advice"
+ON public.doctor_advices
+FOR UPDATE
+USING (
+    doctor_id IN (
+        SELECT id FROM public.users
+        WHERE id = auth.uid()
+    )
+)
+WITH CHECK (
+    doctor_id IN (
+        SELECT id FROM public.users
+        WHERE id = auth.uid()
+    )
+);
+
+-- Policy: Doctors can delete their own advice
+CREATE POLICY "Doctors can delete their own advice"
+ON public.doctor_advices
+FOR DELETE
+USING (
+    doctor_id IN (
+        SELECT id FROM public.users
+        WHERE id = auth.uid()
+    )
+);
+
+-- Policy: Family members can view advice sent to them
+CREATE POLICY "Family members can view their advice"
+ON public.doctor_advices
+FOR SELECT
+USING (
+    family_member_id = auth.uid()
+);
+

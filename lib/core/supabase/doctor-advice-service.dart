@@ -77,7 +77,20 @@ class DoctorAdviceService {
   }
 
   Future<void> deleteAdvice(String adviceId) async {
-    await _client.from(_table).delete().eq('id', adviceId);
+    try {
+      final response = await _client
+          .from(_table)
+          .delete()
+          .eq('id', adviceId)
+          .select();
+      
+      // Verify deletion was successful
+      if (response.isEmpty) {
+        throw Exception('Advice not found or already deleted');
+      }
+    } catch (e) {
+      throw Exception('Failed to delete advice: $e');
+    }
   }
 }
 

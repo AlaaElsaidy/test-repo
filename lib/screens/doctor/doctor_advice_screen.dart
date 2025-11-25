@@ -275,15 +275,34 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
 
     if (confirm != true) return;
 
+    if (!mounted) return;
+    
     try {
+      // Delete from database first
       await _adviceService.deleteAdvice(advice.id);
+      
       if (!mounted) return;
+      
+      // Remove from UI after successful deletion
       setState(() {
         _adviceList.removeWhere((a) => a.id == advice.id);
       });
-      _snack('Advice deleted');
+      
+      // Reload from database to ensure consistency
+      if (_doctorId != null) {
+        await _loadAdvice(_doctorId!);
+      }
+      
+      _snack('Advice deleted successfully');
     } catch (e) {
+      debugPrint('Delete advice error: $e');
+      if (!mounted) return;
       _snack('Failed to delete advice: $e');
+      
+      // Reload to ensure UI is in sync with database
+      if (_doctorId != null) {
+        await _loadAdvice(_doctorId!);
+      }
     }
   }
 
@@ -547,7 +566,13 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
               alignment: Alignment.centerLeft,
               child: ToggleButtons(
                 isSelected: [_tabIndex == 0, _tabIndex == 1],
-                onPressed: (i) => setState(() => _tabIndex = i),
+                onPressed: (i) {
+                  setState(() => _tabIndex = i);
+                  // Reload advice when switching to "My Advice" tab
+                  if (i == 1 && _doctorId != null) {
+                    _loadAdvice(_doctorId!);
+                  }
+                },
                 borderRadius: BorderRadius.circular(20),
                 constraints: const BoxConstraints(minHeight: 40, minWidth: 120),
                 children: const [
@@ -913,126 +938,243 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
 
     return Column(
       children: _adviceList.map((a) {
-        final snippet = a.tips.isNotEmpty ? a.tips.first : 'No tips';
+        final firstTip = a.tips.isNotEmpty ? a.tips.first : null;
         return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Card(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () => _openAdviceDetails(a),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: AppTheme.teal50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        a.videoUrl == null
-                            ? Icons.description
-                            : Icons.play_circle,
-                        color: AppTheme.teal600,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _familyName(a.familyMemberId),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.teal900,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            snippet,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 12, color: AppTheme.gray600),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: (a.status == 'sent'
-                                          ? Colors.green
-                                          : Colors.orange)
-                                      .withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  a.status,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: a.status == 'sent'
-                                        ? Colors.green
-                                        : Colors.orange,
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Card with Family Name, Status, Time, and Delete
+              Card(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      // Family Name and Info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _familyName(a.familyMemberId),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.teal900,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.access_time,
-                                  size: 14, color: AppTheme.gray500),
-                              const SizedBox(width: 4),
-                              Text(
-                                _formatDate(a.createdAt),
-                                style: const TextStyle(
-                                    fontSize: 12, color: AppTheme.gray500),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              if (a.videoUrl != null) ...[
-                                const Icon(Icons.videocam,
-                                    size: 14, color: AppTheme.gray600),
-                                const SizedBox(width: 4),
-                                const Text('Video',
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: (a.status == 'sent'
+                                            ? Colors.green
+                                            : Colors.orange)
+                                        .withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    a.status.toUpperCase(),
                                     style: TextStyle(
-                                        fontSize: 12, color: AppTheme.gray600)),
-                                const SizedBox(width: 10),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: a.status == 'sent'
+                                          ? Colors.green[700]
+                                          : Colors.orange[700],
+                                    ),
+                                  ),
+                                ),
                               ],
-                              const Icon(Icons.tips_and_updates,
-                                  size: 14, color: AppTheme.gray600),
-                              const SizedBox(width: 4),
-                              Text('${a.tips.length} tip(s)',
-                                  style: const TextStyle(
-                                      fontSize: 12, color: AppTheme.gray600)),
-                            ],
-                          ),
-                        ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time,
+                                    size: 16, color: AppTheme.gray500),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    _formatDate(a.createdAt),
+                                    style: const TextStyle(
+                                        fontSize: 13, color: AppTheme.gray600),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const Spacer(),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline,
+                                      color: Colors.red, size: 22),
+                                  onPressed: () => _deleteAdvice(a),
+                                  tooltip: 'Delete advice',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      tooltip: 'Delete advice',
-                      onPressed: () => _deleteAdvice(a),
-                      icon: const Icon(Icons.delete_outline,
-                          color: AppTheme.gray600),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
+
+              // Video Card (if video exists)
+              if (a.videoUrl != null) ...[
+                const SizedBox(height: 12),
+                Card(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  elevation: 2,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => _openVideoUrl(a.videoUrl!),
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.9),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.play_arrow,
+                                    size: 40,
+                                    color: AppTheme.teal600,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Tap to play video',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
+              // Tip Card (if tip exists)
+              if (firstTip != null) ...[
+                const SizedBox(height: 12),
+                Card(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  elevation: 2,
+                  color: AppTheme.teal50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppTheme.teal600,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.lightbulb,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Tip',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.teal600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                firstTip,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: AppTheme.teal900,
+                                  height: 1.4,
+                                ),
+                              ),
+                              if (a.tips.length > 1) ...[
+                                const SizedBox(height: 8),
+                                GestureDetector(
+                                  onTap: () => _openAdviceDetails(a),
+                                  child: Text(
+                                    'View all ${a.tips.length} tips',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.teal600,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
+              // View Details Button
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _openAdviceDetails(a),
+                  icon: const Icon(Icons.info_outline),
+                  label: const Text('View Full Details'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.teal600,
+                    side: const BorderSide(color: AppTheme.teal200),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       }).toList(),

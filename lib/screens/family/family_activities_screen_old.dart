@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
-import 'package:alzcare/core/supabase/activity-service.dart';
-import 'package:alzcare/core/supabase/patient-family-service.dart';
 
 // Colors/Gradient
 const Color kTeal900 = Color(0xFF134E4A);
@@ -25,13 +22,57 @@ class FamilyActivitiesScreen extends StatefulWidget {
 }
 
 class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
-  final ActivityService _activityService = ActivityService();
-  final PatientFamilyService _patientFamilyService = PatientFamilyService();
-
-  String? _familyMemberId;
-  List<Map<String, dynamic>> _allActivities = [];
-  bool _loading = true;
-  String? _error;
+  // بيانات تشمل اليوم وأيام لاحقة للـ Schedule
+  final List<Map<String, dynamic>> activities = [
+    {
+      'name': 'Breakfast',
+      'description': 'Oatmeal and fruits',
+      'done': false,
+      'date': DateTime.now(),
+      'time': '08:00 AM',
+      'reminderType': 'alarm',
+    },
+    {
+      'name': 'Medicine',
+      'description': 'Blood pressure pill after breakfast',
+      'done': false,
+      'date': DateTime.now(),
+      'time': '09:00 AM',
+      'reminderType': 'alarm',
+    },
+    {
+      'name': 'Lunch',
+      'description': 'Grilled chicken and salad',
+      'done': false,
+      'date': DateTime.now(),
+      'time': '01:00 PM',
+      'reminderType': 'vibrate',
+    },
+    {
+      'name': 'Doctor Visit',
+      'description': 'Clinic appointment',
+      'done': false,
+      'date': DateTime.now().add(const Duration(days: 1)),
+      'time': '10:30 AM',
+      'reminderType': 'alarm',
+    },
+    {
+      'name': 'Evening Walk',
+      'description': '15 minutes walk',
+      'done': false,
+      'date': DateTime.now().add(const Duration(days: 2)),
+      'time': '05:00 PM',
+      'reminderType': 'vibrate',
+    },
+    {
+      'name': 'Dinner',
+      'description': 'Light dinner (soup)',
+      'done': false,
+      'date': DateTime.now(),
+      'time': '07:30 PM',
+      'reminderType': 'alarm',
+    },
+  ];
 
   // Week state
   DateTime _weekStart = _startOfWeek(DateTime.now());
@@ -47,71 +88,17 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
   List<DateTime> get _weekDays =>
       List.generate(7, (i) => _weekStart.add(Duration(days: i)));
 
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    try {
-      // Get family member ID
-      final familyUid = SharedPrefsHelper.getString("familyUid") ??
-          SharedPrefsHelper.getString("userId");
-      if (familyUid == null) {
-        throw Exception('Family member ID not found');
-      }
-
-      _familyMemberId = familyUid;
-
-      // Load activities
-      await _refreshActivities();
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _refreshActivities() async {
-    if (_familyMemberId == null) return;
-
-    try {
-      final activities = await _activityService
-          .getActivitiesByFamilyMember(_familyMemberId!);
-      setState(() {
-        _allActivities = activities;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
   List<Map<String, dynamic>> _activitiesForDay(DateTime day) {
     final ds = _fmt(day);
-    final list = _allActivities.where((a) {
-      final scheduledDate = a['scheduled_date'] as String?;
-      if (scheduledDate == null) return false;
-      return scheduledDate == ds;
-    }).toList();
-    list.sort((a, b) {
-      final timeA = (a['scheduled_time'] ?? '').toString();
-      final timeB = (b['scheduled_time'] ?? '').toString();
-      return timeA.compareTo(timeB);
-    });
+    final list = activities
+        .where((a) => a['date'] is DateTime && _fmt(a['date']) == ds)
+        .toList();
+    list.sort((a, b) =>
+        ((a['time'] ?? '') as String).compareTo((b['time'] ?? '') as String));
     return list;
   }
 
+  // CRUD helpers
   Future<bool> _confirmDelete() async {
     final res = await showDialog<bool>(
       context: context,
@@ -133,122 +120,44 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
 
   Future<void> _deleteActivity(Map<String, dynamic> activity) async {
     if (!await _confirmDelete()) return;
-
-    try {
-      final activityId = activity['id'] as String;
-      await _activityService.deleteActivity(activityId);
-      await _refreshActivities();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Activity deleted successfully')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting activity: $e')),
-        );
-      }
-    }
+    setState(() {
+      final idx = activities.indexOf(activity);
+      if (idx != -1) activities.removeAt(idx);
+    });
   }
 
   Future<void> _openEdit(Map<String, dynamic> activity) async {
-    // Get linked patients for this family member
-    List<Map<String, dynamic>> patients = [];
-    if (_familyMemberId != null) {
-      try {
-        patients = await _patientFamilyService
-            .getPatientsByFamily(_familyMemberId!);
-      } catch (e) {
-        debugPrint('Error loading patients: $e');
-      }
-    }
-
     final updated = await Navigator.push<Map<String, dynamic>?>(
       context,
-      MaterialPageRoute(
-        builder: (_) => EditActivitiesView(
-          activity: activity,
-          familyMemberId: _familyMemberId,
-          patients: patients,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => EditActivitiesView(activity: activity)),
     );
     if (updated != null) {
-      await _refreshActivities();
+      setState(() {
+        final idx = activities.indexOf(activity);
+        if (idx != -1) activities[idx] = updated;
+      });
     }
   }
 
   Future<void> _addNew() async {
-    // Get linked patients for this family member
-    List<Map<String, dynamic>> patients = [];
-    if (_familyMemberId != null) {
-      try {
-        patients = await _patientFamilyService
-            .getPatientsByFamily(_familyMemberId!);
-      } catch (e) {
-        debugPrint('Error loading patients: $e');
-      }
-    }
-
-    if (patients.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No patients linked. Please link a patient first.'),
-          ),
-        );
-      }
-      return;
-    }
-
     final newActivity = await Navigator.push<Map<String, dynamic>?>(
       context,
-      MaterialPageRoute(
-        builder: (_) => EditActivitiesView(
-          familyMemberId: _familyMemberId,
-          patients: patients,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => const EditActivitiesView()),
     );
     if (newActivity != null) {
-      await _refreshActivities();
+      setState(() => activities.add(newActivity));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_error != null) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('Error: $_error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadData,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     final todayList = _activitiesForDay(DateTime.now());
-    final todayDone = todayList.where((e) => e['is_done'] == true).length;
+    final todayDone = todayList.where((e) => e['done'] == true).length;
     final todayTotal = todayList.length;
     final todayProgress = todayTotal == 0 ? 0.0 : todayDone / todayTotal;
 
     final selectedList = _activitiesForDay(_selectedDay);
-    final selectedDone = selectedList.where((e) => e['is_done'] == true).length;
+    final selectedDone = selectedList.where((e) => e['done'] == true).length;
     final selectedTotal = selectedList.length;
     final selectedProgress =
         selectedTotal == 0 ? 0.0 : selectedDone / selectedTotal;
@@ -466,12 +375,12 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
       itemCount: list.length,
       itemBuilder: (_, i) {
         final activity = list[i];
-        final completed = activity['is_done'] == true;
+        final idx = activities.indexOf(activity);
+        final completed = activity['done'] == true;
         final color = i.isEven ? kTeal500 : kCyan500;
-        final dateStr = activity['scheduled_date'] as String? ?? '';
-        final timeStr = activity['scheduled_time'] as String? ?? '';
-        // Convert 24-hour time to 12-hour format
-        final timeFormatted = _formatTimeTo12Hour(timeStr);
+        final dateStr = activity['date'] is DateTime
+            ? DateFormat('yyyy-MM-dd').format(activity['date'])
+            : '';
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
@@ -480,12 +389,19 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
               // الكارت
               GestureDetector(
                 onTap: () => _openEdit(activity), // Edit
+                onDoubleTap: () {
+                  // Toggle Done
+                  if (idx != -1) {
+                    setState(() => activities[idx]['done'] =
+                        !(activities[idx]['done'] == true));
+                  }
+                },
                 child: _ActivityCard(
                   title: activity['name'] ?? '',
                   description: activity['description'] ?? '',
                   icon: Icons.psychology,
                   date: dateStr,
-                  time: timeFormatted,
+                  time: (activity['time'] ?? '').toString(),
                   completed: completed,
                   color: color,
                 ),
@@ -536,20 +452,6 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
         );
       },
     );
-  }
-
-  String _formatTimeTo12Hour(String time24) {
-    try {
-      final parts = time24.split(':');
-      if (parts.length != 2) return time24;
-      final hour = int.parse(parts[0]);
-      final minute = parts[1];
-      final period = hour >= 12 ? 'PM' : 'AM';
-      final hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-      return '$hour12:${minute.padLeft(2, '0')} $period';
-    } catch (e) {
-      return time24;
-    }
   }
 }
 
@@ -680,32 +582,22 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
-// ============== Edit Activities ==============
+// ============== Edit Activities (بدون صور/نقاط/صعوبات) ==============
 class EditActivitiesView extends StatefulWidget {
   final Map<String, dynamic>? activity;
-  final String? familyMemberId;
-  final List<Map<String, dynamic>> patients;
 
-  const EditActivitiesView({
-    super.key,
-    this.activity,
-    this.familyMemberId,
-    required this.patients,
-  });
+  const EditActivitiesView({super.key, this.activity});
 
   @override
   State<EditActivitiesView> createState() => _EditActivitiesViewState();
 }
 
 class _EditActivitiesViewState extends State<EditActivitiesView> {
-  final ActivityService _activityService = ActivityService();
   late TextEditingController _nameCtrl;
   late TextEditingController _descCtrl;
   TimeOfDay _selectedTime = const TimeOfDay(hour: 7, minute: 0);
   String _reminderType = 'alarm';
   DateTime? _selectedDate;
-  String? _selectedPatientId;
-  bool _saving = false;
 
   @override
   void initState() {
@@ -713,47 +605,18 @@ class _EditActivitiesViewState extends State<EditActivitiesView> {
     _nameCtrl = TextEditingController(text: widget.activity?['name'] ?? '');
     _descCtrl =
         TextEditingController(text: widget.activity?['description'] ?? '');
-    _reminderType = widget.activity?['reminder_type'] ?? 'alarm';
-    final scheduledDate = widget.activity?['scheduled_date'] as String?;
-    if (scheduledDate != null) {
+    _reminderType = widget.activity?['reminderType'] ?? 'alarm';
+    _selectedDate = widget.activity?['date'] ?? DateTime.now();
+
+    final incomingTime = widget.activity?['time'];
+    if (incomingTime is TimeOfDay) {
+      _selectedTime = incomingTime;
+    } else if (incomingTime is String && incomingTime.isNotEmpty) {
       try {
-        _selectedDate = DateFormat('yyyy-MM-dd').parse(scheduledDate);
-      } catch (e) {
-        _selectedDate = DateTime.now();
-      }
-    } else {
-      _selectedDate = DateTime.now();
+        final parsed = DateFormat('h:mm a').parse(incomingTime);
+        _selectedTime = TimeOfDay.fromDateTime(parsed);
+      } catch (_) {}
     }
-
-    final scheduledTime = widget.activity?['scheduled_time'] as String?;
-    if (scheduledTime != null) {
-      try {
-        final parts = scheduledTime.split(':');
-        if (parts.length == 2) {
-          final hour = int.parse(parts[0]);
-          final minute = int.parse(parts[1]);
-          _selectedTime = TimeOfDay(hour: hour, minute: minute);
-        }
-      } catch (e) {
-        // Keep default
-      }
-    }
-
-    // Set patient ID if editing
-    if (widget.activity != null) {
-      _selectedPatientId = widget.activity!['patient_id'] as String?;
-    } else if (widget.patients.isNotEmpty) {
-      // Default to first patient if adding new
-      _selectedPatientId = widget.patients.first['patients']?['id'] as String? ??
-          widget.patients.first['patient_id'] as String?;
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _descCtrl.dispose();
-    super.dispose();
   }
 
   Future<void> _pickTime() async {
@@ -773,68 +636,22 @@ class _EditActivitiesViewState extends State<EditActivitiesView> {
     if (d != null) setState(() => _selectedDate = d);
   }
 
-  Future<void> _save() async {
+  void _save() {
     if (_nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please enter activity name')));
       return;
     }
-
-    if (_selectedPatientId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a patient')));
-      return;
-    }
-
-    if (widget.familyMemberId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Family member ID not found')));
-      return;
-    }
-
-    setState(() => _saving = true);
-
-    try {
-      final formattedTime = _selectedTime.format(context);
-
-      if (widget.activity != null) {
-        // Update existing activity
-        await _activityService.updateActivity(
-          activityId: widget.activity!['id'] as String,
-          name: _nameCtrl.text.trim(),
-          description: _descCtrl.text.trim().isEmpty
-              ? null
-              : _descCtrl.text.trim(),
-          scheduledDate: _selectedDate,
-          scheduledTime: formattedTime,
-          reminderType: _reminderType,
-        );
-      } else {
-        // Create new activity
-        await _activityService.addActivity(
-          patientId: _selectedPatientId!,
-          familyMemberId: widget.familyMemberId!,
-          name: _nameCtrl.text.trim(),
-          description: _descCtrl.text.trim().isEmpty
-              ? null
-              : _descCtrl.text.trim(),
-          scheduledDate: _selectedDate!,
-          scheduledTime: formattedTime,
-          reminderType: _reminderType,
-        );
-      }
-
-      if (mounted) {
-        Navigator.pop(context, {'success': true});
-      }
-    } catch (e) {
-      setState(() => _saving = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving activity: $e')),
-        );
-      }
-    }
+    final formattedTime = _selectedTime.format(context);
+    final m = {
+      'name': _nameCtrl.text.trim(),
+      'description': _descCtrl.text.trim(),
+      'done': widget.activity?['done'] ?? false,
+      'time': formattedTime,
+      'reminderType': _reminderType,
+      'date': _selectedDate ?? DateTime.now(),
+    };
+    Navigator.pop(context, m);
   }
 
   @override
@@ -844,8 +661,7 @@ class _EditActivitiesViewState extends State<EditActivitiesView> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Text(
-            widget.activity == null ? 'Add Activity' : 'Edit Activity',
+        title: Text(widget.activity == null ? 'Add Activity' : 'Edit Activity',
             style:
                 const TextStyle(color: kTeal500, fontWeight: FontWeight.bold)),
         centerTitle: true,
@@ -858,32 +674,6 @@ class _EditActivitiesViewState extends State<EditActivitiesView> {
         child: SingleChildScrollView(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Patient selection (only for new activities)
-            if (widget.activity == null && widget.patients.isNotEmpty) ...[
-              const Text('Select Patient',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedPatientId,
-                decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Patient'),
-                items: widget.patients.map((p) {
-                  final patient = p['patients'] as Map<String, dynamic>?;
-                  final patientId = patient?['id'] as String? ??
-                      p['patient_id'] as String?;
-                  final patientName = patient?['name'] as String? ?? 'Unknown';
-                  return DropdownMenuItem(
-                    value: patientId,
-                    child: Text(patientName),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() => _selectedPatientId = value);
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
             TextField(
               controller: _nameCtrl,
               decoration: const InputDecoration(
@@ -927,20 +717,11 @@ class _EditActivitiesViewState extends State<EditActivitiesView> {
             ]),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _saving ? null : _save,
+              onPressed: _save,
               style: ElevatedButton.styleFrom(
                   backgroundColor: kTeal500,
                   minimumSize: const Size(double.infinity, 48)),
-              child: _saving
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text('Save', style: TextStyle(color: Colors.white)),
+              child: const Text('Save', style: TextStyle(color: Colors.white)),
             ),
           ]),
         ),
@@ -978,4 +759,3 @@ class _ReminderChip extends StatelessWidget {
     );
   }
 }
-

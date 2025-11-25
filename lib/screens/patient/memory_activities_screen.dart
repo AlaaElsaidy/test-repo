@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../core/shared-prefrences/shared-prefrences-helper.dart';
+import '../../core/supabase/activity-service.dart';
+import '../../core/supabase/supabase-service.dart';
 
 // Colors/Gradient
 const Color kTeal900 = Color(0xFF134E4A);
@@ -22,60 +25,115 @@ class MemoryActivitiesScreen extends StatefulWidget {
 }
 
 class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
-  final List<Map<String, dynamic>> activities = [
-    {
-      'name': 'Breakfast',
-      'description': 'Oatmeal and fruits',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '08:00 AM',
-      'reminderType': 'alarm',
-    },
-    {
-      'name': 'Medicine',
-      'description': 'Blood pressure pill after breakfast',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '09:00 AM',
-      'reminderType': 'alarm',
-    },
-    {
-      'name': 'Lunch',
-      'description': 'Grilled chicken and salad',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '01:00 PM',
-      'reminderType': 'vibrate',
-    },
-    {
-      'name': 'Doctor Visit',
-      'description': 'Clinic appointment',
-      'done': false,
-      'date': DateTime.now().add(const Duration(days: 1)),
-      'time': '10:30 AM',
-      'reminderType': 'alarm',
-    },
-    {
-      'name': 'Evening Walk',
-      'description': '15 minutes walk',
-      'done': false,
-      'date': DateTime.now().add(const Duration(days: 2)),
-      'time': '05:00 PM',
-      'reminderType': 'vibrate',
-    },
-    {
-      'name': 'Dinner',
-      'description': 'Light dinner (soup)',
-      'done': false,
-      'date': DateTime.now(),
-      'time': '07:30 PM',
-      'reminderType': 'alarm',
-    },
-  ];
+  final ActivityService _activityService = ActivityService();
+  final PatientService _patientService = PatientService();
+  
+  List<Map<String, dynamic>> activities = [];
+  bool _loading = true;
+  String? _error;
 
   // Week state
   DateTime _weekStart = _startOfWeek(DateTime.now());
   DateTime _selectedDay = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActivities();
+  }
+
+  Future<void> _loadActivities() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      // Get patient user_id from SharedPreferences
+      final userId = SharedPrefsHelper.getString("userId") ??
+          SharedPrefsHelper.getString("patientUid");
+      
+      if (userId == null) {
+        setState(() {
+          _error = 'User ID not found';
+          _loading = false;
+        });
+        return;
+      }
+
+      // Get patient record to get patient_id (from patients table)
+      final patientRecord = await _patientService.getPatientByUserId(userId);
+      
+      if (patientRecord == null || patientRecord['id'] == null) {
+        setState(() {
+          _error = 'Patient record not found';
+          _loading = false;
+        });
+        return;
+      }
+
+      final patientId = patientRecord['id'] as String;
+
+      // Fetch all activities for this patient
+      final fetchedActivities = await _activityService.getActivitiesByPatient(patientId);
+      
+      // Transform data to match the expected format
+      final transformedActivities = fetchedActivities.map((activity) {
+        // Parse scheduled_date
+        DateTime? date;
+        try {
+          if (activity['scheduled_date'] != null) {
+            date = DateTime.parse(activity['scheduled_date']);
+          }
+        } catch (e) {
+          date = DateTime.now();
+        }
+
+        // Format scheduled_time to 12-hour format
+        String timeStr = '08:00 AM';
+        if (activity['scheduled_time'] != null) {
+          timeStr = _formatTimeTo12Hour(activity['scheduled_time']);
+        }
+
+        return {
+          'id': activity['id'],
+          'name': activity['name'] ?? '',
+          'description': activity['description'] ?? '',
+          'done': activity['is_done'] ?? false,
+          'date': date ?? DateTime.now(),
+          'time': timeStr,
+          'reminderType': activity['reminder_type'] ?? 'alarm',
+        };
+      }).toList();
+
+      setState(() {
+        activities = transformedActivities;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load activities: $e';
+        _loading = false;
+      });
+    }
+  }
+
+  String _formatTimeTo12Hour(String time24) {
+    try {
+      final parts = time24.split(':');
+      if (parts.length >= 2) {
+        int hour = int.parse(parts[0]);
+        final minute = parts[1];
+        final period = hour >= 12 ? 'PM' : 'AM';
+        if (hour > 12) hour -= 12;
+        if (hour == 0) hour = 12;
+        return '$hour:${minute.padLeft(2, '0')} $period';
+      }
+    } catch (e) {
+      // If parsing fails, return as is
+    }
+    return time24;
+  }
 
   static String _fmt(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
 
@@ -99,6 +157,30 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadActivities,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final todayList = _activitiesForDay(DateTime.now());
     final todayDone = todayList.where((e) => e['done'] == true).length;
     final todayTotal = todayList.length;
@@ -115,13 +197,13 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header (أيقونة للزينة فقط)
-          const Padding(
-            padding: EdgeInsets.all(16),
+          // Header with refresh button
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('Memory Activities',
                       style: TextStyle(
                           fontSize: 24,
@@ -131,15 +213,24 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                   Text('Keep your mind active and engaged',
                       style: TextStyle(fontSize: 14, color: kGray600)),
                 ]),
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                        gradient: kTealGradient, shape: BoxShape.circle),
-                    child:
-                        Icon(Icons.auto_awesome, color: Colors.white, size: 24),
-                  ),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.refresh),
+                      onPressed: _loadActivities,
+                      tooltip: 'Refresh',
+                    ),
+                    const SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                            gradient: kTealGradient, shape: BoxShape.circle),
+                        child:
+                            Icon(Icons.auto_awesome, color: Colors.white, size: 24),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -319,7 +410,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
       itemCount: list.length,
       itemBuilder: (_, i) {
         final activity = list[i];
-        final idx = activities.indexOf(activity);
+        final activityId = activity['id'] as String?;
         final completed = activity['done'] == true;
         final color = i.isEven ? kTeal500 : kCyan500;
         final dateStr = activity['date'] is DateTime
@@ -330,10 +421,30 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
           padding: const EdgeInsets.only(bottom: 12),
           child: GestureDetector(
             // المريض: Toggle Done فقط
-            onTap: () {
-              if (idx != -1) {
-                setState(() => activities[idx]['done'] =
-                    !(activities[idx]['done'] == true));
+            onTap: () async {
+              if (activityId != null) {
+                try {
+                  // Toggle done status in Supabase
+                  final newDoneStatus = !completed;
+                  await _activityService.toggleActivityDone(
+                    activityId: activityId,
+                    isDone: newDoneStatus,
+                  );
+                  
+                  // Update local state
+                  setState(() {
+                    final idx = activities.indexWhere((a) => a['id'] == activityId);
+                    if (idx != -1) {
+                      activities[idx]['done'] = newDoneStatus;
+                    }
+                  });
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to update activity: $e')),
+                    );
+                  }
+                }
               }
             },
             child: _ActivityCard(

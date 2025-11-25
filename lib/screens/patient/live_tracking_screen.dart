@@ -11,6 +11,7 @@ import '../../core/shared-prefrences/shared-prefrences-helper.dart';
 import '../../core/supabase/location-tracking-service.dart';
 import '../../core/supabase/safe-zone-service.dart';
 import '../../core/supabase/supabase-service.dart';
+import '../../core/supabase/patient-family-service.dart';
 import '../../theme/app_theme.dart';
 
 class LiveTrackingScreen extends StatefulWidget {
@@ -26,7 +27,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   DateTime? _lastUpdated;
   String? _address;
   String? _emergencyPhone;
-  String? _patientId;
+  String? _patientId; // patient_id from patients table
+  String? _userId; // user_id for saveLocation
   GoogleMapController? _mapController;
   CameraPosition _initialCameraPosition =
       const CameraPosition(target: LatLng(24.7136, 46.6753), zoom: 0);
@@ -34,6 +36,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   final LocationTrackingService _locationService = LocationTrackingService();
   final SafeZoneService _safeZoneService = SafeZoneService();
   final PatientService _patientService = PatientService();
+  final PatientFamilyService _patientFamilyService = PatientFamilyService();
 
   // Safe Zones from database
   List<SafeZone> _safeZones = [];
@@ -56,14 +59,42 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       return;
     }
 
-    setState(() => _patientId = userId);
+    // Store user_id for saveLocation (it expects user_id, not patient_id)
+    setState(() => _userId = userId);
 
-    // Get patient record and emergency phone
+    // Get patient record to get patient_id (from patients table)
     final patient = await _patientService.getPatientByUserId(userId);
+    String? patientId;
+    
     if (patient != null) {
-      setState(() {
-        _emergencyPhone = patient['phone_emergency'] as String?;
-      });
+      patientId = patient['id'] as String?;
+      setState(() => _patientId = patientId);
+      
+      // Try to get phone from family members first
+      String? familyPhone;
+      if (patientId != null) {
+        try {
+          final relations = await _patientFamilyService.getFamilyMembersByPatient(patientId);
+          if (relations.isNotEmpty) {
+            final firstRelation = relations.first;
+            final familyMember = firstRelation['family_members'] as Map<String, dynamic>?;
+            familyPhone = familyMember?['phone'] as String?;
+            if (familyPhone != null && familyPhone.trim().isNotEmpty) {
+              setState(() => _emergencyPhone = familyPhone);
+            }
+          }
+        } catch (e) {
+          debugPrint('Failed to load family members: $e');
+        }
+      }
+      
+      // Fallback to phone_emergency if no family phone found
+      if (_emergencyPhone == null || _emergencyPhone!.isEmpty) {
+        final emergencyPhone = patient['phone_emergency'] as String?;
+        if (emergencyPhone != null && emergencyPhone.trim().isNotEmpty) {
+          setState(() => _emergencyPhone = emergencyPhone);
+        }
+      }
     }
 
     // Load safe zones
@@ -147,10 +178,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       }
 
       // Save location to database
-      if (_patientId != null) {
+      // Note: saveLocation expects user_id, not patient_id
+      if (_userId != null) {
         try {
           await _locationService.saveLocation(
-            patientId: _patientId!,
+            patientId: _userId!,
             latitude: position.latitude,
             longitude: position.longitude,
             address: addr,
@@ -204,33 +236,6 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _openExternalMap() async {
-    if (_pos == null) {
-      await _getCurrentLocation();
-    }
-    final position = _pos;
-    if (position == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Current location not available yet')),
-        );
-      }
-      return;
-    }
-    final uri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=${position.latitude},${position.longitude}',
-    );
-    final launched = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
-    if (!launched && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open maps application')),
-      );
-    }
   }
 
   // Open SMS (Android uses smsto: to avoid WhatsApp prompt)
@@ -569,21 +574,6 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                 ),
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: _loading ? null : _openExternalMap,
-                              icon: const Icon(Icons.map_outlined),
-                              label: const Text('عرض الموقع على الخريطة'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppTheme.teal600,
-                                side: const BorderSide(color: AppTheme.teal200),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                            ),
                           ),
                         ],
                       ),
