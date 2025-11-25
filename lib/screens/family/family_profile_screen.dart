@@ -3,12 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/router/routes.dart';
 import '../../config/shared/widgets/error-dialoge.dart';
 import '../../core/models/invitation-model.dart';
 import '../../core/shared-prefrences/shared-prefrences-helper.dart';
 import '../../core/supabase/auth-service.dart';
 import '../../core/supabase/invitation-service.dart';
 import '../../core/supabase/patient-family-service.dart';
+import '../../core/supabase/supabase-config.dart';
 import '../../core/supabase/supabase-service.dart';
 import '../../screens/patient/invitations/data/invitation-repo.dart';
 import '../../screens/patient/invitations/presentation/cubit/invitation_cubit.dart';
@@ -29,6 +31,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
   List<InvitationModel> _sentInvitations = [];
   bool _isFetchingInvites = false;
   String? _invitesError;
+  late Future<_ProfileData?> _profileFuture;
 
   @override
   void initState() {
@@ -43,6 +46,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
       ),
     );
     _loadInvitations();
+    _profileFuture = _loadProfileData();
   }
 
   @override
@@ -53,6 +57,54 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
 
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<_ProfileData?> _loadProfileData() async {
+    try {
+      final userId =
+          SharedPrefsHelper.getString("familyUid") ?? SharedPrefsHelper.getString("userId");
+      if (userId == null) return null;
+
+      final userService = UserService();
+      final familyMemberService = PatientFamilyService();
+      final supabase = SupabaseConfig.client;
+
+      final user = await userService.getUser(userId);
+      final linkedPatients = await familyMemberService.getPatientsByFamily(userId);
+
+      String? doctorName;
+      String? doctorPhone;
+      String? doctorEmail;
+      final familyMember = await supabase
+          .from('family_members')
+          .select('doctor_id')
+          .eq('id', userId)
+          .maybeSingle();
+      if (familyMember != null && familyMember['doctor_id'] != null) {
+        final doctor = await supabase
+            .from('users')
+            .select('name, phone, email')
+            .eq('id', familyMember['doctor_id'])
+            .maybeSingle();
+        if (doctor != null) {
+          doctorName = doctor['name'] as String?;
+          doctorPhone = doctor['phone'] as String?;
+          doctorEmail = doctor['email'] as String?;
+        }
+      }
+
+      return _ProfileData(
+        userId: userId,
+        user: user,
+        patients: linkedPatients,
+        doctorName: doctorName,
+        doctorPhone: doctorPhone,
+        doctorEmail: doctorEmail,
+      );
+    } catch (e) {
+      debugPrint('Failed to load profile data: $e');
+      return null;
+    }
   }
 
   String _buildInviteMessage(String name) {
@@ -428,6 +480,125 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
     );
   }
 
+  Future<void> _openEditContactSheet(_ProfileData profile) async {
+    final phoneCtrl = TextEditingController(text: profile.userPhone ?? '');
+    final emailCtrl = TextEditingController(text: profile.userEmail ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+          top: 24,
+        ),
+        child: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Edit Contact Info',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.teal900,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: phoneCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Phone number',
+                  prefixIcon: Icon(Icons.phone),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: emailCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Email address',
+                  prefixIcon: Icon(Icons.email),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Email is required';
+                  }
+                  final regex =
+                      RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                  if (!regex.hasMatch(value.trim())) {
+                    return 'Enter a valid email';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (!formKey.currentState!.validate()) return;
+                    try {
+                      final userService = UserService();
+                      await userService.updateUser(profile.userId, {
+                        'phone': phoneCtrl.text.trim().isEmpty
+                            ? null
+                            : phoneCtrl.text.trim(),
+                        'email': emailCtrl.text.trim(),
+                      });
+                      if (mounted) {
+                        Navigator.pop(ctx);
+                        _showSnack('Contact info updated');
+                        setState(() {
+                          _profileFuture = _loadProfileData();
+                        });
+                      }
+                    } catch (e) {
+                      _showSnack('Failed to update: $e');
+                    }
+                  },
+                  child: const Text('Save Changes'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      await AuthService().signOut();
+    } catch (_) {}
+    await SharedPrefsHelper.clear();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      AppRoutes.login,
+      (route) => false,
+    );
+  }
+
+  Future<void> _callDoctor(String? phone) async {
+    if (phone == null || phone.isEmpty) {
+      _showSnack('Doctor phone not available');
+      return;
+    }
+    final telUri = Uri.parse('tel:$phone');
+    if (!await launchUrl(telUri, mode: LaunchMode.externalApplication)) {
+      _showSnack('Could not place call');
+    }
+  }
+
   Widget _buildInvitationsCard() {
     Widget content;
 
@@ -600,328 +771,94 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
           }
         },
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Profile Header
-                Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: AppTheme.tealGradient,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Column(
-                children: [
-                  Stack(
+          child: FutureBuilder<_ProfileData?>(
+            future: _profileFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return _ProfileErrorView(
+                  message: 'Failed to load profile data',
+                  onRetry: () {
+                    setState(() {
+                      _profileFuture = _loadProfileData();
+                    });
+                  },
+                );
+              }
+              final profile = snapshot.data;
+              if (profile == null) {
+                return _ProfileErrorView(
+                  message: 'No profile data available',
+                  onRetry: () {
+                    setState(() {
+                      _profileFuture = _loadProfileData();
+                    });
+                  },
+                );
+              }
+
+              return RefreshIndicator(
+                onRefresh: () async {
+                  setState(() {
+                    _profileFuture = _loadProfileData();
+                  });
+                  await _profileFuture;
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
                     children: [
-                      const CircleAvatar(
-                        radius: 48,
-                        backgroundColor: Colors.white,
-                        child: Icon(
-                          Icons.person,
-                          size: 48,
-                          color: AppTheme.teal500,
-                        ),
+                      _ProfileHeader(
+                        userName: profile.userName,
+                        caregiverRole: profile.user?['role'] ?? 'Caregiver',
+                        caringFor: profile.caringForName,
+                        onEdit: () => _openEditContactSheet(profile),
                       ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.edit,
-                            size: 16,
-                            color: AppTheme.teal600,
-                          ),
-                        ),
+                      const SizedBox(height: 16),
+                      _PatientCard(patients: profile.patients),
+                      const SizedBox(height: 16),
+                      _ContactInfoCard(
+                        phone: profile.userPhone ?? 'Add phone number',
+                        email: profile.userEmail ?? 'Add email',
+                        onEdit: () => _openEditContactSheet(profile),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Emily Smith',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Daughter & Primary Caregiver',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFFCFFAFE),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'Caring for Margaret Smith',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
+                      const SizedBox(height: 16),
+                      _LinkedPatientsCard(patients: profile.patients),
+                      const SizedBox(height: 16),
+                      _buildInvitationsCard(),
+                      const SizedBox(height: 16),
+                      _DoctorContactCard(
+                        doctorName: profile.doctorName,
+                        doctorPhone: profile.doctorPhone,
+                        doctorEmail: profile.doctorEmail,
+                        onCall: () => _callDoctor(profile.doctorPhone),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Patient Info Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Patient Information',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.teal900,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {},
-                          child: const Text('View Profile'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: AppTheme.teal50,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.person,
-                            color: AppTheme.teal600,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Margaret Smith',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.teal900,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                '72 years old',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppTheme.gray600,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Early Alzheimer\'s Stage',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppTheme.teal600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: const BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Contact Information
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'My Contact Information',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.teal900,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {},
-                          child: const Text('Edit'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _InfoRow(
-                      icon: Icons.phone,
-                      label: 'Phone',
-                      value: '+1 (555) 987-6543',
-                      color: AppTheme.teal500,
-                    ),
-                    const SizedBox(height: 12),
-                    _InfoRow(
-                      icon: Icons.email,
-                      label: 'Email',
-                      value: 'emily.smith@email.com',
-                      color: AppTheme.cyan500,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildInvitationsCard(),
-            const SizedBox(height: 16),
-
-            // Doctor Contact Card
-            Card(
-              color: AppTheme.cyan50,
-              child: InkWell(
-                onTap: () {},
-                borderRadius: BorderRadius.circular(16),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppTheme.cyan500,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.medical_services,
-                          color: Colors.white,
-                          size: 24,
-                        ),
+                      const SizedBox(height: 16),
+                      _PrimaryButton(
+                        icon: Icons.person_add_alt_1,
+                        label: 'Invite Patient',
+                        color: AppTheme.teal600,
+                        onPressed: _openInviteDialog,
                       ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Doctor Contact',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.teal900,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Dr. Sarah Johnson',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppTheme.cyan600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.phone,
-                        color: AppTheme.cyan600,
+                      const SizedBox(height: 12),
+                      _PrimaryButton(
+                        icon: Icons.logout,
+                        label: 'Logout',
+                        color: Colors.red,
+                        onPressed: _handleLogout,
                       ),
                     ],
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Invite Patient Button
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: _openInviteDialog,
-                icon: const Icon(Icons.person_add_alt_1),
-                label: const Text(
-                  'Invite Patient',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.teal600,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Logout Button
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.logout),
-                label: const Text(
-                  'Logout',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
-    ),
-  ),
-);
+    );
   }
 }
 
@@ -979,5 +916,479 @@ class _InfoRow extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  final String userName;
+  final String caregiverRole;
+  final String? caringFor;
+  final VoidCallback onEdit;
+
+  const _ProfileHeader({
+    required this.userName,
+    required this.caregiverRole,
+    required this.caringFor,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: AppTheme.tealGradient,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        children: [
+          Stack(
+            children: [
+              const CircleAvatar(
+                radius: 48,
+                backgroundColor: Colors.white,
+                child: Icon(
+                  Icons.person,
+                  size: 48,
+                  color: AppTheme.teal500,
+                ),
+              ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onTap: onEdit,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.edit,
+                      size: 16,
+                      color: AppTheme.teal600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            userName,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            caregiverRole,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFFCFFAFE),
+            ),
+          ),
+          if (caringFor != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Caring for $caringFor',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PatientCard extends StatelessWidget {
+  final List<Map<String, dynamic>> patients;
+
+  const _PatientCard({required this.patients});
+
+  @override
+  Widget build(BuildContext context) {
+    Map<String, dynamic>? firstPatient;
+    if (patients.isNotEmpty) {
+      firstPatient = patients.first['patients'] as Map<String, dynamic>?;
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Primary Patient',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.teal900,
+                  ),
+                ),
+                if (firstPatient != null)
+                  TextButton(
+                    onPressed: () {},
+                    child: const Text('View Profile'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (firstPatient == null)
+              const Text(
+                'No patients linked yet. Invite a patient to start tracking.',
+                style: TextStyle(color: AppTheme.gray600),
+              )
+            else
+              Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppTheme.teal50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.person,
+                      color: AppTheme.teal600,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          firstPatient['name'] ?? 'Patient',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.teal900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Age: ${firstPatient['age'] ?? 'N/A'} • ${firstPatient['gender'] ?? ''}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.gray600,
+                          ),
+                        ),
+                        if (firstPatient['alzheimer_stage'] != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            firstPatient['alzheimer_stage'],
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.teal600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContactInfoCard extends StatelessWidget {
+  final String phone;
+  final String email;
+  final VoidCallback onEdit;
+
+  const _ContactInfoCard({
+    required this.phone,
+    required this.email,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'My Contact Information',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.teal900,
+                  ),
+                ),
+                TextButton(
+                  onPressed: onEdit,
+                  child: const Text('Edit'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _InfoRow(
+              icon: Icons.phone,
+              label: 'Phone',
+              value: phone,
+              color: AppTheme.teal500,
+            ),
+            const SizedBox(height: 12),
+            _InfoRow(
+              icon: Icons.email,
+              label: 'Email',
+              value: email,
+              color: AppTheme.cyan500,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LinkedPatientsCard extends StatelessWidget {
+  final List<Map<String, dynamic>> patients;
+
+  const _LinkedPatientsCard({required this.patients});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'All Linked Patients',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.teal900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (patients.isEmpty)
+              const Text(
+                'You have not linked any patients yet.',
+                style: TextStyle(color: AppTheme.gray600),
+              )
+            else
+              Column(
+                children: patients.map((p) {
+                  final patient = p['patients'] as Map<String, dynamic>?;
+                  if (patient == null) return const SizedBox();
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.teal50,
+                      child: const Icon(Icons.person, color: AppTheme.teal600),
+                    ),
+                    title: Text(patient['name'] ?? 'Patient'),
+                    subtitle: Text(
+                      'Age: ${patient['age'] ?? 'N/A'} • ${patient['gender'] ?? ''}',
+                    ),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DoctorContactCard extends StatelessWidget {
+  final String? doctorName;
+  final String? doctorPhone;
+  final String? doctorEmail;
+  final VoidCallback onCall;
+
+  const _DoctorContactCard({
+    required this.doctorName,
+    required this.doctorPhone,
+    required this.doctorEmail,
+    required this.onCall,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: AppTheme.cyan50,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppTheme.cyan500,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.medical_services,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    doctorName ?? 'No doctor assigned',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.teal900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    doctorPhone ?? doctorEmail ?? 'Add your doctor to contact them easily.',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.cyan600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: doctorPhone != null ? onCall : null,
+              icon: const Icon(Icons.phone, color: AppTheme.cyan600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PrimaryButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const _PrimaryButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ProfileErrorView({
+    required this.message,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppTheme.gray600),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileData {
+  final String userId;
+  final Map<String, dynamic>? user;
+  final List<Map<String, dynamic>> patients;
+  final String? doctorName;
+  final String? doctorPhone;
+  final String? doctorEmail;
+
+  const _ProfileData({
+    required this.userId,
+    required this.user,
+    required this.patients,
+    this.doctorName,
+    this.doctorPhone,
+    this.doctorEmail,
+  });
+
+  String get userName => user?['name'] as String? ?? 'Caregiver';
+  String? get userEmail => user?['email'] as String?;
+  String? get userPhone => user?['phone'] as String?;
+
+  String? get caringForName {
+    if (patients.isEmpty) return null;
+    final firstPatient = patients.first['patients'] as Map<String, dynamic>?;
+    return firstPatient?['name'] as String?;
   }
 }

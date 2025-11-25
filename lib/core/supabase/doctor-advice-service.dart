@@ -75,5 +75,9 @@ class DoctorAdviceService {
 
     return bucket.getPublicUrl(fileName);
   }
+
+  Future<void> deleteAdvice(String adviceId) async {
+    await _client.from(_table).delete().eq('id', adviceId);
+  }
 }
 

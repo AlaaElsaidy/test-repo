@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
@@ -199,15 +198,11 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
     setState(() {});
   }
 
-  Future<void> _saveDraft() async {
-    await _submitAdvice(sendNow: false);
-  }
-
   Future<void> _sendToRelative() async {
-    await _submitAdvice(sendNow: true);
+    await _submitAdvice();
   }
 
-  Future<void> _submitAdvice({required bool sendNow}) async {
+  Future<void> _submitAdvice() async {
     if (!_validateForm()) return;
     if (_doctorId == null) {
       _snack('Doctor ID not found');
@@ -243,20 +238,14 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
         patientId: _selectedPatientId,
         tips: List<String>.from(_tips),
         videoUrl: uploadedVideoUrl,
-        status: sendNow ? 'sent' : 'draft',
+        status: 'sent',
       );
 
       setState(() {
         _adviceList.insert(0, advice);
       });
 
-      if (sendNow) {
-        _shareAdviceExternally(advice);
-        _snack('Advice sent successfully');
-      } else {
-        _snack('Advice saved as draft');
-      }
-
+      _snack('Advice sent successfully');
       _clearForm();
     } catch (e) {
       _snack('Failed to save advice: $e');
@@ -265,18 +254,37 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
     }
   }
 
-  void _shareAdviceExternally(DoctorAdviceModel advice) {
-    final tipsText =
-        advice.tips.isEmpty ? '' : advice.tips.map((t) => '• $t').join('\n');
-    final shareText = 'Doctor Advice'
-        '${tipsText.isEmpty ? '' : '\n\nTips:\n$tipsText'}'
-        '${advice.videoUrl != null ? '\n\nWatch video: ${advice.videoUrl}' : ''}';
+  Future<void> _deleteAdvice(DoctorAdviceModel advice) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Advice'),
+        content: const Text('Are you sure you want to delete this advice?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
 
-    Share.share(shareText, subject: 'Doctor Advice');
-  }
+    if (confirm != true) return;
 
-  void _shareExisting(DoctorAdviceModel advice) {
-    _shareAdviceExternally(advice);
+    try {
+      await _adviceService.deleteAdvice(advice.id);
+      if (!mounted) return;
+      setState(() {
+        _adviceList.removeWhere((a) => a.id == advice.id);
+      });
+      _snack('Advice deleted');
+    } catch (e) {
+      _snack('Failed to delete advice: $e');
+    }
   }
 
   Future<void> _openVideoUrl(String url) async {
@@ -428,62 +436,48 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                 LayoutBuilder(
                   builder: (context, c) {
                     final narrow = c.maxWidth < 380;
+                    final deleteButton = SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          await _deleteAdvice(a);
+                        },
+                        icon: const Icon(Icons.delete),
+                        label: const Text('Delete Advice'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    );
+
+                    final closeButton = SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                        label: const Text('Close'),
+                      ),
+                    );
+
                     if (narrow) {
                       return Column(
                         children: [
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: OutlinedButton.icon(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.close),
-                              label: const Text('Close'),
-                            ),
-                          ),
+                          closeButton,
                           const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton.icon(
-                              onPressed: () => _shareExisting(a),
-                              icon: const Icon(Icons.share),
-                              label: const Text('Share'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.teal600,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
+                          deleteButton,
                         ],
                       );
                     }
+
                     return Row(
                       children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: OutlinedButton.icon(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.close),
-                              label: const Text('Close'),
-                            ),
-                          ),
-                        ),
+                        Expanded(child: closeButton),
                         const SizedBox(width: 8),
-                        Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: ElevatedButton.icon(
-                              onPressed: () => _shareExisting(a),
-                              icon: const Icon(Icons.share),
-                              label: const Text('Share'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.teal600,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
+                        Expanded(child: deleteButton),
                       ],
                     );
                   },
@@ -525,7 +519,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        'Upload a video from phone and share with relatives',
+                        'Upload a video from phone and send to relatives',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 14, color: AppTheme.gray600),
@@ -854,76 +848,32 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
     return LayoutBuilder(
       builder: (context, c) {
         final narrow = c.maxWidth < 380;
+        final button = SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            onPressed: _sending || _families.isEmpty ? null : _sendToRelative,
+            icon: const Icon(Icons.send),
+            label: Text(
+              _sending ? 'Sending...' : 'Send to relative',
+              overflow: TextOverflow.ellipsis,
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.teal600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        );
+
         if (narrow) {
-          return Column(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: _sending ? null : _saveDraft,
-                  icon: const Icon(Icons.save_alt),
-                  label: const Text('Save Draft'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed:
-                      _sending || _families.isEmpty ? null : _sendToRelative,
-                  icon: const Icon(Icons.send),
-                  label: Text(
-                    _sending ? 'Sending...' : 'Send to relative',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.teal600,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ],
-          );
+          return button;
         }
 
         return Row(
           children: [
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: _sending ? null : _saveDraft,
-                  icon: const Icon(Icons.save_alt),
-                  label:
-                      const Text('Save Draft', overflow: TextOverflow.ellipsis),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed:
-                      _sending || _families.isEmpty ? null : _sendToRelative,
-                  icon: const Icon(Icons.send),
-                  label: Text(
-                    _sending ? 'Sending...' : 'Send to relative',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.teal600,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ),
+            Expanded(child: button),
           ],
         );
       },
@@ -952,7 +902,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
             ),
             SizedBox(height: 6),
             Text(
-              'Add a few tips, attach a video, then share with relatives.',
+              'Add a few tips, attach a video, then send to relatives.',
               style: TextStyle(fontSize: 12, color: AppTheme.gray600),
               textAlign: TextAlign.center,
             ),
@@ -1074,9 +1024,10 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      tooltip: 'Share',
-                      onPressed: () => _shareExisting(a),
-                      icon: const Icon(Icons.share, color: AppTheme.gray600),
+                      tooltip: 'Delete advice',
+                      onPressed: () => _deleteAdvice(a),
+                      icon: const Icon(Icons.delete_outline,
+                          color: AppTheme.gray600),
                     ),
                   ],
                 ),
