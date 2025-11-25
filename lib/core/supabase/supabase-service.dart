@@ -62,23 +62,30 @@ class PatientService {
   }) async {
     // Check if patient record already exists
     final existing = await getPatientByUserId(patientId);
-    if (existing != null) {
-      // Patient record already exists, don't insert again
-      return;
-    }
     
-    await _client.from('patients').insert({
-      'user_id': patientId,
+    final data = {
       'age': age,
       'gender': gender,
-      'alzheimer_stage': stage,
-      'home_address': homeAddress,
-      'phone_emergency': phoneEmergency,
-      'latitude': latitude,
-      'longitude': longitude,
       'name': name,
-      'photo_url': photoUrl,
-    });
+      if (stage != null) 'alzheimer_stage': stage,
+      if (homeAddress != null) 'home_address': homeAddress,
+      if (phoneEmergency != null) 'phone_emergency': phoneEmergency,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+      if (photoUrl != null) 'photo_url': photoUrl,
+    };
+    
+    if (existing != null) {
+      // Patient record already exists, update it
+      final patientRecordId = existing['id'] as String;
+      await _client.from('patients').update(data).eq('id', patientRecordId);
+    } else {
+      // New patient, insert
+      await _client.from('patients').insert({
+        'user_id': patientId,
+        ...data,
+      });
+    }
   }
 
   Future<Map<String, dynamic>?> getPatientByUserId(String userId) async {

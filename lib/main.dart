@@ -134,7 +134,7 @@ class _MyAppState extends State<MyApp> {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        initialRoute: AppRoutes.login,
+        initialRoute: AppRoutes.roleSelection,
         onGenerateRoute: AppRouter.onGenerate,
         // home: Builder(builder: (context) => DoctorSelectionScreen(),),
         supportedLocales: const [Locale("en"), Locale("ar")],

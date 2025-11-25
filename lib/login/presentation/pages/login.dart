@@ -82,9 +82,22 @@ class _SignInScreenState extends State<SignInScreen> {
               if (user.role == "patient") {
                 await SharedPrefsHelper.saveString(
                     "patientUid", state.user!['id']);
+                
+                // Check if patient profile exists in Supabase
+                final patientService = PatientService();
+                final patientRecord = await patientService.getPatientByUserId(state.user!['id']);
+                
+                // Check if patient has complete profile (has name, age, gender, etc.)
+                final hasCompleteProfile = patientRecord != null &&
+                    patientRecord['name'] != null &&
+                    patientRecord['age'] != null &&
+                    patientRecord['gender'] != null;
+                
                 Navigator.pushNamedAndRemoveUntil(
                   context,
-                  AppRoutes.patientDetails,
+                  hasCompleteProfile
+                      ? AppRoutes.patientMain
+                      : AppRoutes.patientDetails,
                   (route) => false,
                 );
               } else if (user.role == "family") {

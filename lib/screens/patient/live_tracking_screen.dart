@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/shared-prefrences/shared-prefrences-helper.dart';
@@ -26,6 +27,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   String? _address;
   String? _emergencyPhone;
   String? _patientId;
+  GoogleMapController? _mapController;
+  CameraPosition _initialCameraPosition =
+      const CameraPosition(target: LatLng(24.7136, 46.6753), zoom: 0);
 
   final LocationTrackingService _locationService = LocationTrackingService();
   final SafeZoneService _safeZoneService = SafeZoneService();
@@ -41,8 +45,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   }
 
   Future<void> _initData() async {
-    final userId = SharedPrefsHelper.getString("userId") ?? 
-                   SharedPrefsHelper.getString("patientUid");
+    final userId = SharedPrefsHelper.getString("userId") ??
+        SharedPrefsHelper.getString("patientUid");
     if (userId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -67,6 +71,12 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
 
     // Get current location
     _getCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSafeZones() async {
@@ -165,7 +175,13 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         _address = addr;
         _lastUpdated = DateTime.now();
         _loading = false;
+        _initialCameraPosition = CameraPosition(
+          target: LatLng(position.latitude, position.longitude),
+          zoom: 16,
+        );
       });
+
+      _animateCameraToCurrentLocation();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -173,6 +189,47 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         );
       }
       setState(() => _loading = false);
+    }
+  }
+
+  void _animateCameraToCurrentLocation() {
+    final controller = _mapController;
+    final position = _pos;
+    if (controller == null || position == null) return;
+    controller.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(position.latitude, position.longitude),
+          zoom: 16,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openExternalMap() async {
+    if (_pos == null) {
+      await _getCurrentLocation();
+    }
+    final position = _pos;
+    if (position == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Current location not available yet')),
+        );
+      }
+      return;
+    }
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=${position.latitude},${position.longitude}',
+    );
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open maps application')),
+      );
     }
   }
 
@@ -316,6 +373,44 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     return false;
   }
 
+  Set<Circle> get _safeZoneCircles {
+    return _safeZones
+        .where((zone) => zone.isActive)
+        .map(
+          (zone) => Circle(
+            circleId: CircleId(zone.id ?? zone.name),
+            center: LatLng(zone.latitude, zone.longitude),
+            radius: zone.radiusMeters.toDouble(),
+            strokeWidth: 2,
+            strokeColor: _insideAnyZone
+                ? Colors.green.withOpacity(0.7)
+                : Colors.red.withOpacity(0.7),
+            fillColor: _insideAnyZone
+                ? Colors.green.withOpacity(0.15)
+                : Colors.red.withOpacity(0.15),
+          ),
+        )
+        .toSet();
+  }
+
+  Set<Marker> get _currentLocationMarker {
+    if (_pos == null) return {};
+    return {
+      Marker(
+        markerId: const MarkerId('current_location'),
+        position: LatLng(_pos!.latitude, _pos!.longitude),
+        infoWindow: InfoWindow(
+          title: 'You are here',
+          snippet: _address ??
+              '${_pos!.latitude.toStringAsFixed(5)}, ${_pos!.longitude.toStringAsFixed(5)}',
+        ),
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+          _insideAnyZone ? BitmapDescriptor.hueAzure : BitmapDescriptor.hueRed,
+        ),
+      ),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final statusColor = _insideAnyZone ? Colors.green : Colors.red;
@@ -332,98 +427,78 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
           // Map Container (Responsive to avoid overflow)
           Expanded(
             flex: 2,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppTheme.teal100, AppTheme.cyan100],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            child: Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: _initialCameraPosition,
+                  circles: _safeZoneCircles,
+                  markers: _currentLocationMarker,
+                  myLocationButtonEnabled: false,
+                  myLocationEnabled: true,
+                  liteModeEnabled: false, // Disable lite mode to show full map
+                  mapType: MapType.normal,
+                  compassEnabled: false,
+                  zoomControlsEnabled: false,
+                  onMapCreated: (controller) {
+                    _mapController = controller;
+                    // Move camera to current location if available
+                    if (_pos != null) {
+                      _mapController!.animateCamera(
+                        CameraUpdate.newLatLngZoom(
+                          LatLng(_pos!.latitude, _pos!.longitude),
+                          15.0,
+                        ),
+                      );
+                    }
+                  },
                 ),
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final w = constraints.maxWidth;
-                  final h = constraints.maxHeight;
-                  final ring = (w < h ? w : h) * 0.68;
-                  final pin = (ring * 0.28).clamp(36.0, 80.0);
-                  final borderW = (ring * 0.015).clamp(2.0, 6.0);
-
-                  return Stack(
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Align(
-                        alignment: Alignment.center,
-                        child: Container(
-                          width: ring,
-                          height: ring,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: statusColor.withOpacity(0.3),
-                              width: borderW,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Text(
+                              statusText,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Align(
-                        alignment: Alignment.center,
-                        child: Container(
-                          width: pin,
-                          height: pin,
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: statusColor.withOpacity(0.6),
-                                blurRadius: 20,
-                                spreadRadius: 5,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.location_on,
-                            color: Colors.white,
-                            size: pin * 0.5,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                statusText,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                      const SizedBox(height: 12),
+                      FloatingActionButton.small(
+                        heroTag: 'recenter_map',
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppTheme.teal600,
+                        onPressed: _loading ? null : _animateCameraToCurrentLocation,
+                        child: const Icon(Icons.my_location),
                       ),
                     ],
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -437,58 +512,77 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
-                      child: Row(
+                      child: Column(
                         children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: _insideAnyZone
-                                  ? Colors.green[100]
-                                  : Colors.red[100],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              _insideAnyZone ? Icons.shield : Icons.error,
-                              color: _insideAnyZone
-                                  ? Colors.green[600]
-                                  : Colors.red[600],
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: _insideAnyZone
+                                      ? Colors.green[100]
+                                      : Colors.red[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  _insideAnyZone ? Icons.shield : Icons.error,
+                                  color: _insideAnyZone
+                                      ? Colors.green[600]
+                                      : Colors.red[600],
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Current Location',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.teal900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      addressText,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: AppTheme.gray600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _insideAnyZone
+                                          ? 'Within safe zone'
+                                          : 'Outside safe zone',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: _insideAnyZone
+                                            ? Colors.green
+                                            : Colors.red,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Current Location',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.teal900,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  addressText,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: AppTheme.gray600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _insideAnyZone
-                                      ? 'Within safe zone'
-                                      : 'Outside safe zone',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: _insideAnyZone
-                                        ? Colors.green
-                                        : Colors.red,
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: _loading ? null : _openExternalMap,
+                              icon: const Icon(Icons.map_outlined),
+                              label: const Text('عرض الموقع على الخريطة'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.teal600,
+                                side: const BorderSide(color: AppTheme.teal200),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                              ),
                             ),
                           ),
                         ],

@@ -402,13 +402,16 @@ class _InvitationAcceptanceScreenState extends State<InvitationAcceptanceScreen>
             } else if (state is InvitationAccepted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Invitation accepted successfully!'),
+                  content:
+                      Text('Invitation accepted! Please sign in to continue.'),
                   backgroundColor: Colors.green,
                 ),
               );
+              SharedPrefsHelper.remove("patientUid");
+              SharedPrefsHelper.remove("userId");
               Navigator.pushNamedAndRemoveUntil(
                 context,
-                AppRoutes.patientMain,
+                AppRoutes.login,
                 (route) => false,
               );
             } else if (state is InvitationRejected) {

@@ -4,6 +4,9 @@
         android:name="${applicationName}"
         android:label="Memora"
         android:theme="@style/NormalTheme">
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyBqvqJLFJ_TEikaVw43lTldm2T3dl0e7GE" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

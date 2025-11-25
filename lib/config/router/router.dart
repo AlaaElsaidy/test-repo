@@ -18,7 +18,7 @@ class AppRouter {
     switch (settings.name) {
       case AppRoutes.login:
         return MaterialPageRoute(builder: (context) => const SignInScreen());
-      case AppRoutes.welcome:
+      case AppRoutes.roleSelection:
         return MaterialPageRoute(
             builder: (context) => const RoleSelectionScreen());
 
@@ -41,6 +41,9 @@ class AppRouter {
       case AppRoutes.doctorMain:
         return MaterialPageRoute(
             builder: (context) => const DoctorMainScreen());
+      case AppRoutes.patientMain:
+        return MaterialPageRoute(
+            builder: (context) => const PatientMainScreen());
 
       case AppRoutes.service:
         return MaterialPageRoute(builder: (context) => const ServiceScreen());

@@ -34,6 +34,16 @@ class PatientDetailsCubit extends Cubit<PatientDetailsState> {
     );
   }
 
+  /// Upload photo and return URL directly (for synchronous use)
+  Future<String?> uploadPhotoAndGetUrl(String patientId, File imageFile) async {
+    final result = await patientDetailsRepo.uploadPhoto(
+        patientId: patientId, imageFile: imageFile);
+    return result.fold(
+      (error) => null,
+      (url) => url,
+    );
+  }
+
   Future<void> getLocation() async {
     emit(GetLocationLoading());
     var data = await getCurrentLocation();

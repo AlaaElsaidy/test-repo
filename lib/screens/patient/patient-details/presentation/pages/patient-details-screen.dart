@@ -43,6 +43,46 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
   Position? position;
   String _selectedGender = 'Male';
   DateTime dateTime = DateTime.now();
+  bool _isCheckingProfile = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPatientProfile();
+  }
+
+  Future<void> _checkPatientProfile() async {
+    final patientUid = SharedPrefsHelper.getString("patientUid") ??
+        SharedPrefsHelper.getString("userId");
+    
+    if (patientUid == null) {
+      setState(() => _isCheckingProfile = false);
+      return;
+    }
+
+    try {
+      final patientService = PatientService();
+      final patientRecord = await patientService.getPatientByUserId(patientUid);
+      
+      // Check if patient has complete profile
+      final hasCompleteProfile = patientRecord != null &&
+          patientRecord['name'] != null &&
+          patientRecord['age'] != null &&
+          patientRecord['gender'] != null;
+      
+      if (hasCompleteProfile && mounted) {
+        // Profile already exists, redirect to main screen
+        Navigator.pushReplacementNamed(context, AppRoutes.patientMain);
+        return;
+      }
+    } catch (e) {
+      debugPrint('Error checking patient profile: $e');
+    }
+    
+    if (mounted) {
+      setState(() => _isCheckingProfile = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -54,6 +94,14 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Show loading while checking profile
+    if (_isCheckingProfile) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: LoadingPage()),
+      );
+    }
+    
     final width = MediaQuery.of(context).size.width;
     return BlocProvider(
       create: (context) =>
@@ -87,7 +135,15 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                   await SharedPrefsHelper.saveString("patientUid", userId);
                 }
               }
-              Navigator.pushReplacementNamed(context, AppRoutes.service);
+              final currentUserId = SharedPrefsHelper.getString("userId");
+              if (currentUserId != null) {
+                await SharedPrefsHelper.saveBool(
+                    "patientProfileCompleted_$currentUserId", true);
+              }
+              Navigator.pushReplacementNamed(
+                context,
+                AppRoutes.patientMain,
+              );
             }
           },
           child: BlocBuilder<PatientDetailsCubit, PatientDetailsState>(
@@ -376,23 +432,62 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                                       onClick: () async {
                                         FocusScope.of(context).unfocus();
                                         if (_formKey.currentState!.validate()) {
+                                          // Validate location is set
+                                          if (position == null || address == null) {
+                                            showErrorDialog(
+                                              context: context,
+                                              title: "Location Required",
+                                              error: "Please set your home location before saving.",
+                                            );
+                                            return;
+                                          }
+                                          
+                                          // Upload photo first if it's a local file path
+                                          String? finalPhotoUrl = imagePath;
+                                          if (imagePath != null && !imagePath!.startsWith('http')) {
+                                            // It's a local file, need to upload it
+                                            final patientUid = SharedPrefsHelper.getString("patientUid");
+                                            if (patientUid != null) {
+                                              try {
+                                                final file = File(imagePath!);
+                                                final cubit = BlocProvider.of<PatientDetailsCubit>(context);
+                                                final uploadedUrl = await cubit.uploadPhotoAndGetUrl(patientUid, file);
+                                                if (uploadedUrl == null) {
+                                                  showErrorDialog(
+                                                    context: context,
+                                                    title: "Photo Upload Failed",
+                                                    error: "Failed to upload photo. Please try again.",
+                                                  );
+                                                  return;
+                                                }
+                                                finalPhotoUrl = uploadedUrl;
+                                              } catch (e) {
+                                                showErrorDialog(
+                                                  context: context,
+                                                  title: "Photo Upload Error",
+                                                  error: e.toString(),
+                                                );
+                                                return;
+                                              }
+                                            }
+                                          }
+                                          
                                           int age = calculateAge(dateTime);
-                                          print(age);
-                                          PatientModel patientModel =
-                                              PatientModel(
-                                            patientId:
-                                                SharedPrefsHelper.getString(
-                                                    "patientUid")!,
+                                          PatientModel patientModel = PatientModel(
+                                            patientId: SharedPrefsHelper.getString("patientUid")!,
                                             age: age,
                                             name: _nameController.text,
                                             gender: _selectedGender,
+                                            stage: "Early", // Default stage, can be made selectable later
                                             homeAddress: address!,
+                                            phoneEmergency: _phoneController.text.trim().isEmpty 
+                                                ? null 
+                                                : _phoneController.text.trim(),
                                             latitude: position!.latitude,
                                             longitude: position!.longitude,
-                                            photoUrl: imagePath,
+                                            photoUrl: finalPhotoUrl,
                                           );
-                                          await BlocProvider.of<
-                                                  PatientDetailsCubit>(context)
+                                          await BlocProvider.of<PatientDetailsCubit>(context)
                                               .addPatient(patientModel);
                                         }
                                       },

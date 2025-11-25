@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/shared-prefrences/shared-prefrences-helper.dart';
@@ -46,10 +47,21 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
   List<Map<String, dynamic>> _history = [];
   bool _loadingHistory = false;
 
+  // Map
+  GoogleMapController? _mapController;
+  CameraPosition _initialCameraPosition =
+      const CameraPosition(target: LatLng(24.7136, 46.6753), zoom: 4);
+
   @override
   void initState() {
     super.initState();
     _initData();
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
   }
 
   Future<void> _initData() async {
@@ -140,7 +152,12 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
             _lastUpdated = DateTime.now();
           }
           _loadingLocation = false;
+          _initialCameraPosition = CameraPosition(
+            target: LatLng(_patient!.lat, _patient!.lng),
+            zoom: 15,
+          );
         });
+        _animateMapToPatient();
       } else {
         debugPrint('No location data found for patient');
         setState(() => _loadingLocation = false);
@@ -234,6 +251,67 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
   bool get _isInsideAnyActiveZone {
     if (_patient == null) return false;
     return _safeZones.any(_isInsideZone);
+  }
+
+  Set<Circle> get _safeZoneCircles {
+    if (_safeZones.isEmpty) return {};
+    return _safeZones.where((z) => z.isActive).map((zone) {
+      return Circle(
+        circleId: CircleId(zone.id ?? zone.name),
+        center: LatLng(zone.latitude, zone.longitude),
+        radius: zone.radiusMeters.toDouble(),
+        strokeWidth: 2,
+        strokeColor: ( _patient != null && _isInsideZone(zone)
+                ? Colors.green
+                : Colors.red )
+            .withOpacity(0.7),
+        fillColor: ( _patient != null && _isInsideZone(zone)
+                ? Colors.green
+                : Colors.red )
+            .withOpacity(0.15),
+      );
+    }).toSet();
+  }
+
+  Set<Marker> get _patientMarkers {
+    if (_patient == null) return {};
+    return {
+      Marker(
+        markerId: const MarkerId('patient'),
+        position: LatLng(_patient!.lat, _patient!.lng),
+        infoWindow: InfoWindow(
+          title: _patientName ?? 'Patient',
+          snippet: _patientAddress,
+        ),
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+          _isInsideAnyActiveZone
+              ? BitmapDescriptor.hueGreen
+              : BitmapDescriptor.hueRed,
+        ),
+      ),
+    };
+  }
+
+  void _animateMapToPatient() {
+    if (_mapController == null || _patient == null) return;
+    _mapController!.animateCamera(
+      CameraUpdate.newLatLngZoom(
+        LatLng(_patient!.lat, _patient!.lng),
+        15,
+      ),
+    );
+  }
+
+  void _onMapCreated(GoogleMapController controller) {
+    _mapController = controller;
+    if (_patient != null) {
+      controller.moveCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(_patient!.lat, _patient!.lng),
+          15,
+        ),
+      );
+    }
   }
 
   String _timeAgo(DateTime t) {
@@ -744,6 +822,11 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                           lng: _patient!.lng,
                           label: '${_patientName ?? "Patient"} location',
                         ),
+                        mapInitialCamera: _initialCameraPosition,
+                        mapCircles: _safeZoneCircles,
+                        mapMarkers: _patientMarkers,
+                        onMapCreated: _onMapCreated,
+                        onRecenter: _animateMapToPatient,
                       )
                 : _selectedTab == 1
                     // Editor directly (like Doctor screen)
@@ -999,6 +1082,11 @@ class _LiveTrackingView extends StatelessWidget {
   final String lastUpdatedLabel;
   final VoidCallback onRefresh;
   final VoidCallback onDirections;
+  final CameraPosition mapInitialCamera;
+  final Set<Circle> mapCircles;
+  final Set<Marker> mapMarkers;
+  final void Function(GoogleMapController) onMapCreated;
+  final VoidCallback onRecenter;
 
   const _LiveTrackingView({
     required this.isInsideAny,
@@ -1008,100 +1096,78 @@ class _LiveTrackingView extends StatelessWidget {
     required this.lastUpdatedLabel,
     required this.onRefresh,
     required this.onDirections,
+    required this.mapInitialCamera,
+    required this.mapCircles,
+    required this.mapMarkers,
+    required this.onMapCreated,
+    required this.onRecenter,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Map Area (illustration)
+        // Map Area
         Expanded(
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.teal100, AppTheme.cyan100],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          child: Stack(
+            children: [
+              GoogleMap(
+                initialCameraPosition: mapInitialCamera,
+                markers: mapMarkers,
+                circles: mapCircles,
+                myLocationEnabled: false,
+                myLocationButtonEnabled: false,
+                mapType: MapType.normal,
+                zoomControlsEnabled: false,
+                compassEnabled: false,
+                onMapCreated: onMapCreated,
               ),
-            ),
-            child: Stack(
-              children: [
-                // Illustration
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Colors.green.withOpacity(0.3),
-                            width: 3,
-                          ),
-                          shape: BoxShape.circle,
-                        ),
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Column(
+                  children: [
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      const SizedBox(height: 20),
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: statusColor.withOpacity(0.6),
-                              blurRadius: 20,
-                              spreadRadius: 5,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
                             ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.person_pin_circle,
-                          color: Colors.white,
-                          size: 32,
-                        ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            statusText,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-
-                // Status Badge
-                Positioned(
-                  top: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          statusText,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 12),
+                    FloatingActionButton.small(
+                      heroTag: 'family_map_recenter',
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppTheme.teal600,
+                      onPressed: onRecenter,
+                      child: const Icon(Icons.my_location),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
 

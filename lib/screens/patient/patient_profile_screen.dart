@@ -1,19 +1,12 @@
 import 'dart:io';
 
-import 'package:alzcare/config/shared/widgets/error-dialoge.dart';
+import 'package:alzcare/config/router/routes.dart';
 import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
 import 'package:alzcare/core/supabase/auth-service.dart';
-import 'package:alzcare/core/supabase/invitation-service.dart';
 import 'package:alzcare/core/supabase/patient-family-service.dart';
 import 'package:alzcare/core/supabase/supabase-service.dart';
-import 'package:alzcare/screens/patient/invitations/data/invitation-repo.dart';
-import 'package:alzcare/screens/patient/invitations/presentation/cubit/invitation_cubit.dart';
-import 'package:alzcare/screens/patient/invitations/presentation/cubit/invitation_state.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../theme/app_theme.dart';
 
@@ -48,12 +41,24 @@ class PatientProfileScreen extends StatefulWidget {
 class _PatientProfileScreenState extends State<PatientProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  final PatientService _patientService = PatientService();
+  final UserService _userService = UserService();
+  final PatientFamilyService _patientFamilyService = PatientFamilyService();
+  final AuthService _authService = AuthService();
+
   late Patient _patient;
   bool _editing = false;
+  bool _loading = true;
+  bool _saving = false;
+  bool _uploadingPhoto = false;
 
   // Image picker
   final ImagePicker _picker = ImagePicker();
   File? _avatarFile;
+
+  String? _patientRowId;
+  String? _patientUserId;
+  String? _errorMessage;
 
   // Controllers (no age in UI)
   late final TextEditingController _nameCtrl;
@@ -61,18 +66,12 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   late final TextEditingController _emailCtrl;
   late final TextEditingController _addressCtrl;
 
-  late final TextEditingController _emNameCtrl;
-  late final TextEditingController _emRelationCtrl;
-  late final TextEditingController _emPhoneCtrl;
+  FamilyContact? _familyContact;
 
-  // Language (UI only, local to this screen)
-  String _languageCode = 'en';
-
-  bool get _isAr => _languageCode == 'ar';
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
 
   String tr(String en, String ar) => _isAr ? ar : en;
-
-  String? _currentInvitationLink;
 
   @override
   void initState() {
@@ -89,12 +88,9 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     _emailCtrl = TextEditingController(text: _patient.email);
     _addressCtrl = TextEditingController(text: _patient.address);
 
-    _emNameCtrl =
-        TextEditingController(text: _patient.emergencyContact?.name ?? '');
-    _emRelationCtrl =
-        TextEditingController(text: _patient.emergencyContact?.relation ?? '');
-    _emPhoneCtrl =
-        TextEditingController(text: _patient.emergencyContact?.phone ?? '');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadProfileData();
+    });
   }
 
   @override
@@ -103,9 +99,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
     _addressCtrl.dispose();
-    _emNameCtrl.dispose();
-    _emRelationCtrl.dispose();
-    _emPhoneCtrl.dispose();
     super.dispose();
   }
 
@@ -116,9 +109,174 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     _phoneCtrl.text = _patient.phone;
     _emailCtrl.text = _patient.email;
     _addressCtrl.text = _patient.address;
-    _emNameCtrl.text = _patient.emergencyContact?.name ?? '';
-    _emRelationCtrl.text = _patient.emergencyContact?.relation ?? '';
-    _emPhoneCtrl.text = _patient.emergencyContact?.phone ?? '';
+  }
+
+  Future<void> _loadProfileData() async {
+    final patientUid = SharedPrefsHelper.getString("patientUid") ??
+        SharedPrefsHelper.getString("userId");
+
+    if (patientUid == null) {
+      setState(() {
+        _errorMessage = tr(
+            'Patient account not found', 'تعذّر العثور على حساب المريض');
+        _loading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+      _patientUserId = patientUid;
+    });
+
+    try {
+      final patientMap = await _patientService.getPatientByUserId(patientUid);
+      final userMap = await _userService.getUser(patientUid);
+
+      String? patientRowId = patientMap?['id'] as String?;
+
+      FamilyContact? familyContact;
+      if (patientRowId != null) {
+        try {
+          final relations =
+              await _patientFamilyService.getFamilyMembersByPatient(
+            patientRowId,
+          );
+          if (relations.isNotEmpty) {
+            final first = relations.first;
+            final relative = first['family_members'] as Map<String, dynamic>?;
+            familyContact = FamilyContact(
+              id: relative?['id'] as String?,
+              name: (relative?['name'] as String?) ?? '',
+              relation: (first['relation_type'] as String?) ?? '',
+              phone: (relative?['phone'] as String?) ??
+                  (patientMap?['phone_emergency'] as String? ?? ''),
+            );
+          }
+        } catch (_) {
+          // ignore family load errors, fall back to phone emergency below
+        }
+      }
+
+      if (familyContact == null) {
+        final emergencyPhone =
+            (patientMap?['phone_emergency'] as String?)?.trim();
+        if (emergencyPhone != null && emergencyPhone.isNotEmpty) {
+          familyContact = FamilyContact(
+            id: null,
+            name: '',
+            relation: '',
+            phone: emergencyPhone,
+          );
+        }
+      }
+
+      final dynamic ageRaw = patientMap?['age'];
+      final int resolvedAge = ageRaw is int
+          ? ageRaw
+          : int.tryParse(ageRaw?.toString() ?? '') ?? _patient.age;
+      final String? userPhone =
+          (userMap?['phone'] as String?)?.trim();
+      final String? userEmail = (userMap?['email'] as String?);
+      final String? patientAddress =
+          (patientMap?['home_address'] as String?)?.trim();
+      final String? patientPhoto = (patientMap?['photo_url'] as String?);
+      final String? patientName = (patientMap?['name'] as String?);
+      final String? userName = (userMap?['name'] as String?);
+
+      final updatedPatient = Patient(
+        name: patientName ?? userName ?? _patient.name,
+        age: resolvedAge,
+        phone: (userPhone != null && userPhone.isNotEmpty)
+            ? userPhone
+            : _patient.phone,
+        email: userEmail ?? _patient.email,
+        address: patientAddress?.isNotEmpty == true
+            ? patientAddress!
+            : _patient.address,
+        emergencyContact: familyContact != null
+            ? EmergencyContact(
+                name: familyContact.name,
+                relation: familyContact.relation,
+                phone: familyContact.phone,
+              )
+            : _patient.emergencyContact,
+        avatarPath: patientPhoto ?? _patient.avatarPath,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _patient = updatedPatient;
+        _patientRowId = patientRowId ?? _patientRowId;
+        _familyContact = familyContact;
+        _nameCtrl.text = updatedPatient.name;
+        _phoneCtrl.text = updatedPatient.phone;
+        _emailCtrl.text = updatedPatient.email;
+        _addressCtrl.text = updatedPatient.address;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage =
+            tr('Failed to load profile', 'فشل تحميل الملف الشخصي');
+        _loading = false;
+      });
+    }
+  }
+
+  void _showMessage(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? Colors.red : null,
+      ),
+    );
+  }
+
+  ImageProvider? _buildAvatarImage(Patient patient) {
+    if (_avatarFile != null) return FileImage(_avatarFile!);
+    final path = patient.avatarPath;
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http')) return NetworkImage(path);
+    final file = File(path);
+    if (file.existsSync()) {
+      return FileImage(file);
+    }
+    return null;
+  }
+
+  Future<void> _uploadAvatar(File file) async {
+    if (_patientUserId == null) {
+      _showMessage(tr('Patient account not ready', 'حساب المريض غير جاهز'),
+          error: true);
+      return;
+    }
+    setState(() => _uploadingPhoto = true);
+    try {
+      final url = await _patientService.uploadPatientPhoto(
+        _patientUserId!,
+        file,
+      );
+      if (_patientRowId != null) {
+        await _patientService
+            .updatePatient(_patientRowId!, {'photo_url': url});
+      }
+      setState(() {
+        _patient = _patient.copyWith(avatarPath: url);
+      });
+    } catch (e) {
+      _showMessage(
+        tr('Failed to upload photo', 'فشل رفع الصورة'),
+        error: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingPhoto = false);
+      }
+    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -129,7 +287,9 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         maxWidth: 1024,
       );
       if (picked != null) {
-        setState(() => _avatarFile = File(picked.path)); // show immediately
+        final file = File(picked.path);
+        setState(() => _avatarFile = file); // show immediately
+        await _uploadAvatar(file);
       }
       if (mounted) Navigator.of(context).maybePop();
     } catch (e) {
@@ -137,9 +297,21 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     }
   }
 
-  void _removeAvatar() {
-    setState(() => _avatarFile = null);
+  Future<void> _removeAvatar() async {
     Navigator.of(context).maybePop();
+    setState(() => _avatarFile = null);
+    if (_patientRowId == null) return;
+    try {
+      await _patientService.updatePatient(_patientRowId!, {'photo_url': null});
+      setState(() {
+        _patient = _patient.copyWith(avatarPath: null);
+      });
+    } catch (e) {
+      _showMessage(
+        tr('Failed to remove photo', 'تعذّر حذف الصورة'),
+        error: true,
+      );
+    }
   }
 
   void _openAvatarSheet() {
@@ -195,324 +367,138 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       ),
     );
     if (confirm == true && mounted) {
-      Navigator.pop(context);
+      try {
+        await _authService.signOut();
+      } catch (_) {}
+      await SharedPrefsHelper.clear();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.login,
+        (route) => false,
+      );
     }
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-
-    final updated = _patient.copyWith(
-      name: _nameCtrl.text.trim(),
-      phone: _phoneCtrl.text.trim(),
-      email: _emailCtrl.text.trim(),
-      address: _addressCtrl.text.trim(),
-      emergencyContact: (_emNameCtrl.text.trim().isEmpty &&
-              _emRelationCtrl.text.trim().isEmpty &&
-              _emPhoneCtrl.text.trim().isEmpty)
-          ? null
-          : EmergencyContact(
-              name: _emNameCtrl.text.trim(),
-              relation: _emRelationCtrl.text.trim(),
-              phone: _emPhoneCtrl.text.trim(),
-            ),
-      avatarPath: _avatarFile?.path,
-    );
-
-    setState(() {
-      _patient = updated;
-      _editing = false;
-    });
-
-    widget.onSave?.call(updated);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(tr('Profile updated successfully ✅',
-              'تم تحديث الملف الشخصي بنجاح ✅'))),
-    );
-  }
-
-  // Language change (UI only)
-  void _onLanguageChanged(String code) {
-    setState(() => _languageCode = code);
-  }
-
-  void _comingSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(tr('Coming soon', 'قريبًا'))),
-    );
-  }
-
-  void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  String _buildInviteMessage(String name) {
-    final link = _currentInvitationLink ?? 'https://alzcare.app/invite';
-    return _isAr
-        ? 'مرحبًا ${name.isEmpty ? '' : name}، تمت إضافتك كقريب للمساعدة في الرعاية. انضم عبر الرابط: $link'
-        : 'Hi ${name.isEmpty ? '' : name}, you have been added as a relative to assist with care. Join using this link: $link';
-  }
-
-  // WhatsApp invite (implemented)
-  Future<void> _sendWhatsApp(String? phone, String message) async {
-    if (phone == null || phone.trim().isEmpty) {
-      _showSnack(tr('Please provide a phone number', 'من فضلك أدخل رقم هاتف'));
-      return;
-    }
-    // WhatsApp requires digits only in wa.me links
-    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) {
-      _showSnack(tr(
-          'Please provide a valid phone number', 'من فضلك أدخل رقم هاتف صحيح'));
+    if (_patientUserId == null) {
+      _showMessage(
+        tr('Patient account not ready', 'حساب المريض غير جاهز'),
+        error: true,
+      );
       return;
     }
 
-    final encoded = Uri.encodeComponent(message);
-    final nativeUri = Uri.parse('whatsapp://send?phone=$digits&text=$encoded');
+    setState(() => _saving = true);
 
-    // Try native app first, fallback to web wa.me
-    if (await canLaunchUrl(nativeUri)) {
-      final ok =
-          await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
-      if (!ok) {
-        final webUri = Uri.parse('https://wa.me/$digits?text=$encoded');
-        if (!await launchUrl(webUri, mode: LaunchMode.externalApplication)) {
-          _showSnack(tr('Could not open WhatsApp', 'تعذّر فتح واتساب'));
-        }
+    final name = _nameCtrl.text.trim();
+    final phone = _phoneCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    final address = _addressCtrl.text.trim();
+    try {
+      final futures = <Future<void>>[
+        _userService.updateUser(_patientUserId!, {
+          'name': name,
+          'phone': phone,
+          'email': email,
+        }),
+      ];
+
+      if (_patientRowId != null) {
+        final contactPhone = _familyContact?.phone;
+        futures.add(_patientService.updatePatient(_patientRowId!, {
+          'name': name,
+          'home_address': address,
+          'phone_emergency':
+              (contactPhone != null && contactPhone.isNotEmpty)
+                  ? contactPhone
+                  : null,
+        }));
       }
-    } else {
-      final webUri = Uri.parse('https://wa.me/$digits?text=$encoded');
-      if (!await launchUrl(webUri, mode: LaunchMode.externalApplication)) {
-        _showSnack(tr('Could not open WhatsApp', 'تعذّر فتح واتساب'));
+
+      await Future.wait(futures);
+
+      final updated = _patient.copyWith(
+        name: name,
+        phone: phone,
+        email: email,
+        address: address,
+        emergencyContact: _familyContact != null
+            ? EmergencyContact(
+                name: _familyContact!.name,
+                relation: _familyContact!.relation,
+                phone: _familyContact!.phone,
+              )
+            : null,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _patient = updated;
+        _editing = false;
+      });
+      widget.onSave?.call(updated);
+
+      _showMessage(tr('Profile updated successfully ✅',
+          'تم تحديث الملف الشخصي بنجاح ✅'));
+    } catch (e) {
+      _showMessage(
+        tr('Failed to save changes', 'فشل حفظ التعديلات'),
+        error: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
       }
     }
-  }
-
-  // Invite Relative (collects data then shows share options)
-  void _openInviteDialog() {
-    final nameCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => BlocProvider(
-        create: (context) => InvitationCubit(
-          InvitationRepo(
-            InvitationService(),
-            PatientFamilyService(),
-            UserService(),
-            AuthService(),
-            PatientService(),
-          ),
-        ),
-        child: BlocListener<InvitationCubit, InvitationState>(
-          listener: (context, state) {
-            if (state is InvitationFailure) {
-              Navigator.pop(ctx);
-              showErrorDialog(
-                context: context,
-                error: state.errorMessage,
-                title: "Error",
-              );
-            } else if (state is InvitationSuccess) {
-              _currentInvitationLink =
-                  'https://alzcare.app/invite?code=${state.invitation.invitationCode}';
-              Navigator.pop(ctx);
-              _openInviteShareSheet(
-                name: nameCtrl.text.trim(),
-                phone: phoneCtrl.text.trim(),
-                email: emailCtrl.text.trim(),
-              );
-            }
-          },
-          child: BlocBuilder<InvitationCubit, InvitationState>(
-            builder: (context, state) {
-              return AlertDialog(
-                title: Text(tr('Invite a relative', 'دعوة قريب')),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildTextField(
-                          controller: nameCtrl,
-                          label: tr('Name', 'الاسم'),
-                          icon: Icons.person,
-                          validator: (v) => v == null || v.trim().isEmpty
-                              ? tr('Name is required', 'الاسم مطلوب')
-                              : null,
-                        ),
-                        const SizedBox(height: 10),
-                        _buildTextField(
-                          controller: phoneCtrl,
-                          label: tr('Phone (optional)', 'الهاتف (اختياري)'),
-                          icon: Icons.phone,
-                          keyboardType: TextInputType.phone,
-                        ),
-                        const SizedBox(height: 10),
-                        _buildTextField(
-                          controller: emailCtrl,
-                          label: tr('Email (optional)', 'البريد الإلكتروني (اختياري)'),
-                          icon: Icons.email,
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (v) {
-                            if (v != null && v.trim().isNotEmpty) {
-                              final emailRegex = RegExp(
-                                  r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-                              if (!emailRegex.hasMatch(v.trim())) {
-                                return tr('Invalid email', 'بريد إلكتروني غير صحيح');
-                              }
-                            }
-                            return null;
-                          },
-                        ),
-                        if (phoneCtrl.text.trim().isEmpty &&
-                            emailCtrl.text.trim().isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              tr('Please provide either phone or email',
-                                  'يرجى إدخال رقم الهاتف أو البريد الإلكتروني'),
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: Text(tr('Cancel', 'إلغاء')),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: state is InvitationLoading
-                        ? null
-                        : () {
-                            if (formKey.currentState!.validate()) {
-                              final phone = phoneCtrl.text.trim();
-                              final email = emailCtrl.text.trim();
-
-                              if (phone.isEmpty && email.isEmpty) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  SnackBar(
-                                    content: Text(tr(
-                                        'Please provide either phone or email',
-                                        'يرجى إدخال رقم الهاتف أو البريد الإلكتروني')),
-                                  ),
-                                );
-                                return;
-                              }
-
-                              final patientUid =
-                                  SharedPrefsHelper.getString("patientUid");
-                              if (patientUid == null) {
-                                Navigator.pop(ctx);
-                                showErrorDialog(
-                                  context: context,
-                                  error: "Patient ID not found",
-                                  title: "Error",
-                                );
-                                return;
-                              }
-
-                              context.read<InvitationCubit>().createInvitation(
-                                    patientId: patientUid,
-                                    familyMemberEmail:
-                                        email.isNotEmpty ? email : null,
-                                    familyMemberPhone:
-                                        phone.isNotEmpty ? phone : null,
-                                  );
-                            }
-                          },
-                    icon: state is InvitationLoading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.arrow_forward),
-                    label: Text(tr('Continue', 'متابعة')),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _openInviteShareSheet(
-      {required String name, String? phone, String? email}) {
-    final message = _buildInviteMessage(name);
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.sms),
-              title: Text(tr('Send via SMS', 'إرسال عبر الرسائل')),
-              onTap: () {
-                Navigator.pop(context);
-                _comingSoon();
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.chat, color: Colors.green.shade700),
-              title: const Text('WhatsApp'),
-              onTap: () {
-                Navigator.pop(context);
-                _sendWhatsApp(phone, message);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.email),
-              title: Text(tr('Send email', 'إرسال بريد إلكتروني')),
-              onTap: () {
-                Navigator.pop(context);
-                _comingSoon();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.copy),
-              title: Text(tr('Copy link', 'نسخ الرابط')),
-              onTap: () {
-                Navigator.pop(context);
-                if (_currentInvitationLink != null) {
-                  Clipboard.setData(
-                      ClipboardData(text: _currentInvitationLink!));
-                  _showSnack(tr('Link copied to clipboard', 'تم نسخ الرابط'));
-                } else {
-                  _showSnack(tr('No invitation link available',
-                      'لا يوجد رابط دعوة متاح'));
-                }
-              },
-            ),
-            const SizedBox(height: 6),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final p = _patient;
+
+    if (_loading) {
+      return Directionality(
+        textDirection: _isAr ? TextDirection.rtl : TextDirection.ltr,
+        child: const SafeArea(
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Directionality(
+        textDirection: _isAr ? TextDirection.rtl : TextDirection.ltr,
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline,
+                      size: 48, color: Colors.red),
+                  const SizedBox(height: 12),
+                  Text(
+                    _errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadProfileData,
+                    child: Text(tr('Retry', 'إعادة المحاولة')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final avatarImage = _buildAvatarImage(p);
 
     return Directionality(
       textDirection: _isAr ? TextDirection.rtl : TextDirection.ltr,
@@ -538,26 +524,38 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                           CircleAvatar(
                             radius: 40,
                             backgroundColor: Colors.white,
-                            backgroundImage: _avatarFile != null
-                                ? FileImage(_avatarFile!)
-                                : (p.avatarPath != null &&
-                                        p.avatarPath!.isNotEmpty)
-                                    ? FileImage(File(p.avatarPath!))
-                                    : null,
-                            child: (_avatarFile == null &&
-                                    (p.avatarPath == null ||
-                                        p.avatarPath!.isEmpty))
+                            backgroundImage: avatarImage,
+                            child: avatarImage == null
                                 ? const Icon(Icons.person,
                                     size: 40, color: AppTheme.teal500)
                                 : null,
                           ),
+                          if (_uploadingPhoto)
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.25),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           Positioned(
                             right: 0,
                             bottom: 0,
                             child: Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                onTap: _openAvatarSheet,
+                                onTap: _uploadingPhoto ? null : _openAvatarSheet,
                                 customBorder: const CircleBorder(),
                                 child: Container(
                                   padding: const EdgeInsets.all(8),
@@ -593,119 +591,44 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                 // Actions: Edit / Save / Cancel
                 Align(
                   alignment: AlignmentDirectional.centerEnd,
-                  child: _editing
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TextButton(
-                              onPressed: () {
-                                _resetForm();
-                                setState(() => _editing = false);
-                              },
-                              child: Text(tr('Cancel', 'إلغاء')),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton.icon(
-                              onPressed: _save,
-                              icon: const Icon(Icons.save),
-                              label: Text(tr('Save', 'حفظ')),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.teal600,
-                                foregroundColor: Colors.white,
-                                shape: const StadiumBorder(),
-                              ),
-                            ),
-                          ],
-                        )
-                      : OutlinedButton.icon(
+              child: _editing
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          onPressed: _saving
+                              ? null
+                              : () {
+                                  _resetForm();
+                                  setState(() => _editing = false);
+                                },
+                          child: Text(tr('Cancel', 'إلغاء')),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: _saving ? null : _save,
+                          icon: _saving
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                )
+                              : const Icon(Icons.save),
+                          label: Text(tr('Save', 'حفظ')),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.teal600,
+                            foregroundColor: Colors.white,
+                            shape: const StadiumBorder(),
+                          ),
+                        ),
+                      ],
+                    )
+                  : OutlinedButton.icon(
                           onPressed: _toggleEdit,
                           icon: const Icon(Icons.edit),
                           label: Text(tr('Edit', 'تعديل')),
                         ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Settings (with Language label fixed to single line)
-                Card(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  elevation: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: AppTheme.teal50,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.settings,
-                                  color: AppTheme.teal600),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                tr('Settings', 'الإعدادات'),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.teal900,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            const Icon(Icons.language, color: AppTheme.teal600),
-                            const SizedBox(width: 12),
-                            // FIX: keep the label on one line
-                            Expanded(
-                              child: Text(
-                                tr('Language', 'اللغة'),
-                                maxLines: 1,
-                                softWrap: false,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            ToggleButtons(
-                              isSelected: [
-                                _languageCode == 'en',
-                                _languageCode == 'ar'
-                              ],
-                              onPressed: (i) =>
-                                  _onLanguageChanged(i == 0 ? 'en' : 'ar'),
-                              borderRadius: BorderRadius.circular(20),
-                              constraints: const BoxConstraints(
-                                  minHeight: 40, minWidth: 84),
-                              children: const [
-                                Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  child: Text('English'),
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  child: Text('العربية'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
 
                 const SizedBox(height: 12),
@@ -823,26 +746,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      if (_editing) ...[
-                        _buildTextField(
-                          controller: _emNameCtrl,
-                          label: tr('Contact name', 'اسم جهة الاتصال'),
-                          icon: Icons.person,
-                        ),
-                        const SizedBox(height: 10),
-                        _buildTextField(
-                          controller: _emRelationCtrl,
-                          label: tr('Relation', 'الصلة'),
-                          icon: Icons.diversity_2,
-                        ),
-                        const SizedBox(height: 10),
-                        _buildTextField(
-                          controller: _emPhoneCtrl,
-                          label: tr('Phone', 'الهاتف'),
-                          icon: Icons.phone,
-                          keyboardType: TextInputType.phone,
-                        ),
-                      ] else ...[
+                      if (_familyContact != null)
                         Row(
                           children: [
                             Container(
@@ -861,7 +765,10 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    p.emergencyContact?.name ?? '-',
+                                    _familyContact!.name.isNotEmpty
+                                        ? _familyContact!.name
+                                        : tr('Linked family member',
+                                            'القريب المرتبط'),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -871,12 +778,17 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                                     ),
                                   ),
                                   Text(
-                                    p.emergencyContact?.relation ?? '-',
+                                    _familyContact!.relation.isNotEmpty
+                                        ? _familyContact!.relation
+                                        : tr('Family member', 'قريب'),
                                     style: const TextStyle(
                                         fontSize: 13, color: Colors.orange),
                                   ),
                                   Text(
-                                    p.emergencyContact?.phone ?? '-',
+                                    _familyContact!.phone.isNotEmpty
+                                        ? _familyContact!.phone
+                                        : tr('No phone available',
+                                            'لا يوجد رقم هاتف'),
                                     style: const TextStyle(
                                         fontSize: 13, color: Colors.orange),
                                   ),
@@ -884,31 +796,18 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                               ),
                             ),
                           ],
+                        )
+                      else
+                        Text(
+                          tr(
+                              'No family member is linked yet. Please ask your family to send an invitation.',
+                              'لا يوجد قريب مرتبط حتى الآن، يرجى طلب دعوة من العائلة.'),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange,
+                          ),
                         ),
-                      ],
                     ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Invite Relative Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: _openInviteDialog,
-                    icon: const Icon(Icons.person_add_alt_1),
-                    label: Text(tr('Send invite', 'إرسال دعوة')),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.teal600,
-                      foregroundColor: Colors.white,
-                      textStyle: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
-                    ),
                   ),
                 ),
 
@@ -1017,6 +916,20 @@ class _InfoRow extends StatelessWidget {
       ],
     );
   }
+}
+
+class FamilyContact {
+  final String? id;
+  final String name;
+  final String relation;
+  final String phone;
+
+  const FamilyContact({
+    required this.id,
+    required this.name,
+    required this.relation,
+    required this.phone,
+  });
 }
 
 // Models
