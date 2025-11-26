@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 class AppTheme {
   static const Color tealPrimary = Color(0xFF14B8A6);
@@ -38,57 +37,66 @@ class AppTheme {
     end: Alignment.bottomRight,
   );
 
-  static final ThemeData lightTheme = ThemeData(
-    useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: tealPrimary,
-      brightness: Brightness.light,
-    ).copyWith(
-      primary: tealPrimary,
-      secondary: cyanPrimary,
-      surface: Colors.white,
-      background: gray50,
-    ),
-    scaffoldBackgroundColor: Colors.transparent,
-    fontFamily: 'System',
-
-    // AppBar Theme
-    appBarTheme: const AppBarTheme(
-      elevation: 0,
-      centerTitle: true,
-      backgroundColor: Colors.transparent,
-      foregroundColor: teal900,
-      systemOverlayStyle: SystemUiOverlayStyle.dark,
-    ),
-
-    cardTheme: const CardThemeData(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(16)),
-      ),
-      clipBehavior: Clip.antiAlias,
-    ),
-
-    // Button Themes
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-    ),
-
-    // Input Decoration
-    inputDecorationTheme: const InputDecorationTheme(
-      filled: true,
-      fillColor: gray100,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(16)),
-        borderSide: BorderSide.none,
-      ),
-      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    ),
+  static const LinearGradient darkGradient = LinearGradient(
+    colors: [
+      Color(0xFF0B1120),
+      Color(0xFF0F172A),
+      Color(0xFF111827),
+    ],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
   );
+
+// static final ThemeData lightTheme = ThemeData(
+//   useMaterial3: true,
+//   colorScheme: ColorScheme.fromSeed(
+//     seedColor: tealPrimary,
+//     brightness: Brightness.light,
+//   ).copyWith(
+//     primary: tealPrimary,
+//     secondary: cyanPrimary,
+//     surface: Colors.white,
+//     background: gray50,
+//   ),
+//   fontFamily: 'System',
+//
+//   // AppBar Theme
+//   appBarTheme: const AppBarTheme(
+//     elevation: 0,
+//     centerTitle: true,
+//     backgroundColor: Colors.transparent,
+//     foregroundColor: teal900,
+//     systemOverlayStyle: SystemUiOverlayStyle.dark,
+//   ),
+//
+//   cardTheme: const CardThemeData(
+//     elevation: 2,
+//     shape: RoundedRectangleBorder(
+//       borderRadius: BorderRadius.all(Radius.circular(16)),
+//     ),
+//     clipBehavior: Clip.antiAlias,
+//   ),
+//
+//   // Button Themes
+//   elevatedButtonTheme: ElevatedButtonThemeData(
+//     style: ElevatedButton.styleFrom(
+//       elevation: 0,
+//       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+//       shape: RoundedRectangleBorder(
+//         borderRadius: BorderRadius.circular(16),
+//       ),
+//     ),
+//   ),
+//
+//   // Input Decoration
+//   inputDecorationTheme: const InputDecorationTheme(
+//     filled: true,
+//     fillColor: gray100,
+//     border: OutlineInputBorder(
+//       borderRadius: BorderRadius.all(Radius.circular(16)),
+//       borderSide: BorderSide.none,
+//     ),
+//     contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+//   ),
+// );
 }

@@ -131,4 +131,10 @@ class DoctorService {
 
     return response;
   }
+
+  Future<Map<String, dynamic>?> getDoctorByUserId(String userId) async {
+    final response =
+        await _client.from('doctors').select().eq('id', userId).maybeSingle();
+    return response;
+  }
 }

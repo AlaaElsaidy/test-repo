@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 
 import 'config/Theme/app_theme.dart';
+import 'config/Theme/theme-cubit/ThemeCubit.dart';
 import 'config/injector/app_injector.dart';
-import 'config/router/router.dart';
-import 'config/router/routes.dart';
 import 'config/screen_sizer/ScreenSizer.dart';
+import 'core/lang-cubit/lang_cubit.dart';
 import 'core/shared-prefrences/shared-prefrences-helper.dart';
 import 'core/supabase/supabase-config.dart';
 import 'l10n/app_localizations.dart';
+import 'screens/doctor/doctor_main_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -31,25 +33,40 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ScreenSizer(
       size: const Size(430, 932),
-      child: MaterialApp(
-        navigatorKey: navigatorKey,
-        debugShowCheckedModeBanner: false,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => ThemeCubit()..loadTheme()),
+          BlocProvider(create: (_) => LanguageCubit()..loadLanguage()),
         ],
-        initialRoute: AppRoutes.login,
-        onGenerateRoute: AppRouter.onGenerate,
-        // home: Builder(builder: (context) => DoctorSelectionScreen(),),
-        supportedLocales: const [Locale("en"), Locale("ar")],
-        locale: const Locale("en"),
-        themeMode: ThemeMode.system,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
+        child: BlocBuilder<LanguageCubit, Locale>(
+          builder: (context, locale) {
+            return BlocBuilder<ThemeCubit, ThemeMode>(
+              builder: (context, themeMode) {
+                return MaterialApp(
+                  navigatorKey: navigatorKey,
+                  debugShowCheckedModeBanner: false,
+                  localizationsDelegates: const [
+                    AppLocalizations.delegate,
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  // initialRoute: AppRoutes.login,
+                  // onGenerateRoute: AppRouter.onGenerate,
+                  home: const DoctorMainScreen(),
+                  supportedLocales: const [Locale("en"), Locale("ar")],
+                  locale: locale,
+                  themeMode: themeMode,
+                  theme: AppTheme.lightTheme,
+                  darkTheme: AppTheme.darkTheme,
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
 }
+
 

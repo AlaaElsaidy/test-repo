@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -36,7 +37,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get connectionError => 'خطأ في الاتصال';
 
   @override
-  String get cancel => 'تم الإلغاء';
+  String get cancel => 'إلغاء';
 
   @override
   String get receiveTimeout => 'انتهت مهلة الاستقبال';
@@ -91,7 +92,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get verificationCode => 'رمز التحقق';
 
   @override
-  String get confirmPassword => 'تأكيد الرقم السري';
+  String get confirmPassword => 'تأكيد كلمة المرور';
 
   @override
   String get next => 'التالي';
@@ -104,4 +105,79 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get returnToLoginPage => 'الرجوع لصفحة تسجيل الدخول';
+
+  @override
+  String get profile => 'الملف الشخصي';
+
+  @override
+  String get doctorName => 'د. سارة جونسون';
+
+  @override
+  String get specialization => 'استشارية أعصاب - متخصصة ألزهايمر';
+
+  @override
+  String yearsExperience(int years) {
+    return 'خبرة $years سنة';
+  }
+
+  @override
+  String get activePatients => 'مرضى نشطون';
+
+  @override
+  String get totalCases => 'إجمالي الحالات';
+
+  @override
+  String get contactInformation => 'معلومات التواصل';
+
+  @override
+  String get edit => 'تعديل';
+
+  @override
+  String get phone => 'الهاتف';
+
+  @override
+  String get hospital => 'المستشفى';
+
+  @override
+  String get notifications => 'الإشعارات';
+
+  @override
+  String get workingHours => 'ساعات العمل';
+
+  @override
+  String get privacySecurity => 'الخصوصية والأمان';
+
+  @override
+  String get helpSupport => 'المساعدة والدعم';
+
+  @override
+  String get logout => 'تسجيل الخروج';
+
+  @override
+  String get language => 'اللغة';
+
+  @override
+  String get darkMode => 'الوضع الداكن';
+
+  @override
+  String get save => 'حفظ';
+
+  @override
+  String get editContactInfo => 'تعديل معلومات التواصل';
+
+  @override
+  String get changePasswordTitle => 'تغيير كلمة المرور';
+
+  @override
+  String get changePasswordMandatoryNote =>
+      'لأمانك، يجب تعيين كلمة مرور جديدة قبل المتابعة.';
+
+  @override
+  String get newPassword => 'كلمة مرور جديدة';
+
+  @override
+  String get passwordTooShort => 'كلمة المرور يجب ألا تقل عن 8 أحرف';
+
+  @override
+  String get passwordsDontMatch => 'كلمتا المرور غير متطابقتين';
 }

@@ -155,7 +155,7 @@ abstract class AppLocalizations {
   /// No description provided for @cancel.
   ///
   /// In en, this message translates to:
-  /// **'Canceled'**
+  /// **'Cancel'**
   String get cancel;
 
   /// No description provided for @receiveTimeout.
@@ -197,7 +197,7 @@ abstract class AppLocalizations {
   /// No description provided for @email.
   ///
   /// In en, this message translates to:
-  /// **'E-mail'**
+  /// **'Email'**
   String get email;
 
   /// No description provided for @password.
@@ -263,7 +263,7 @@ abstract class AppLocalizations {
   /// No description provided for @confirmPassword.
   ///
   /// In en, this message translates to:
-  /// **'ConfirmPassword'**
+  /// **'Confirm password'**
   String get confirmPassword;
 
   /// No description provided for @next.
@@ -289,6 +289,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Return to Login Page'**
   String get returnToLoginPage;
+
+  /// No description provided for @profile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profile;
+
+  /// No description provided for @doctorName.
+  ///
+  /// In en, this message translates to:
+  /// **'Dr. Sarah Johnson'**
+  String get doctorName;
+
+  /// No description provided for @specialization.
+  ///
+  /// In en, this message translates to:
+  /// **'Neurologist - Alzheimer\'s Specialist'**
+  String get specialization;
+
+  /// No description provided for @yearsExperience.
+  ///
+  /// In en, this message translates to:
+  /// **'{years} years experience'**
+  String yearsExperience(int years);
+
+  /// No description provided for @activePatients.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Patients'**
+  String get activePatients;
+
+  /// No description provided for @totalCases.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Cases'**
+  String get totalCases;
+
+  /// No description provided for @contactInformation.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Information'**
+  String get contactInformation;
+
+  /// No description provided for @edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get edit;
+
+  /// No description provided for @phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get phone;
+
+  /// No description provided for @hospital.
+  ///
+  /// In en, this message translates to:
+  /// **'Hospital'**
+  String get hospital;
+
+  /// No description provided for @notifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get notifications;
+
+  /// No description provided for @workingHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Working Hours'**
+  String get workingHours;
+
+  /// No description provided for @privacySecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy & Security'**
+  String get privacySecurity;
+
+  /// No description provided for @helpSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & Support'**
+  String get helpSupport;
+
+  /// No description provided for @logout.
+  ///
+  /// In en, this message translates to:
+  /// **'Logout'**
+  String get logout;
+
+  /// No description provided for @language.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get language;
+
+  /// No description provided for @darkMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark Mode'**
+  String get darkMode;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// No description provided for @editContactInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit contact information'**
+  String get editContactInfo;
+
+  /// No description provided for @changePasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change your password'**
+  String get changePasswordTitle;
+
+  /// No description provided for @changePasswordMandatoryNote.
+  ///
+  /// In en, this message translates to:
+  /// **'For your security, please create a new password before you continue.'**
+  String get changePasswordMandatoryNote;
+
+  /// No description provided for @newPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get newPassword;
+
+  /// No description provided for @passwordTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 8 characters'**
+  String get passwordTooShort;
+
+  /// No description provided for @passwordsDontMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords don\'t match'**
+  String get passwordsDontMatch;
 }
 
 class _AppLocalizationsDelegate

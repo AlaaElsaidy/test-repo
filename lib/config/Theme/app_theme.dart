@@ -5,7 +5,7 @@ import '../utilis/app_colors.dart';
 class AppTheme {
   static ThemeData lightTheme = ThemeData(
     fontFamily: 'OpenSans',
-    scaffoldBackgroundColor: Colors.white,
+    scaffoldBackgroundColor: Color(0xffffffff),
     appBarTheme:
         const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
     textSelectionTheme: const TextSelectionThemeData(
@@ -14,7 +14,7 @@ class AppTheme {
     ),
   );
   static ThemeData darkTheme = ThemeData(
-    scaffoldBackgroundColor: Colors.black,
+    scaffoldBackgroundColor: Color(0xFF111827),
     fontFamily: 'OpenSans',
   );
 }

@@ -31,5 +31,39 @@
   "next": "Next",
   "passwordMatch": "The password doesn't match",
   "allDone": "All Done!",
-  "returnToLoginPage": "Return to Login Page"
+  "returnToLoginPage": "Return to Login Page",
+  "profile": "Profile",
+  "doctorName": "Dr. Sarah Johnson",
+  "specialization": "Neurologist - Alzheimer's Specialist",
+  "yearsExperience": "{years} years experience",
+  "@yearsExperience": {
+    "placeholders": {
+      "years": {
+        "type": "int"
+      }
+    }
+  },
+  "activePatients": "Active Patients",
+  "totalCases": "Total Cases",
+  "contactInformation": "Contact Information",
+  "edit": "Edit",
+  "phone": "Phone",
+  "email": "Email",
+  "hospital": "Hospital",
+  "notifications": "Notifications",
+  "workingHours": "Working Hours",
+  "privacySecurity": "Privacy & Security",
+  "helpSupport": "Help & Support",
+  "logout": "Logout",
+  "language": "Language",
+  "darkMode": "Dark Mode",
+  "save": "Save",
+  "cancel": "Cancel",
+  "editContactInfo": "Edit contact information",
+  "changePasswordTitle": "Change your password",
+  "changePasswordMandatoryNote": "For your security, please create a new password before you continue.",
+  "newPassword": "New password",
+  "confirmPassword": "Confirm password",
+  "passwordTooShort": "Password must be at least 8 characters",
+  "passwordsDontMatch": "Passwords don't match"
 }

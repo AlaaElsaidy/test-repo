@@ -108,7 +108,7 @@ import '../../theme/app_theme.dart';
 import 'doctor_advice_screen.dart';
 import 'doctor_chat_screen.dart';
 import 'doctor_dashboard.dart';
-import 'doctor_profile_screen.dart';
+import 'profile/presentation/pages/doctor_profile_screen.dart';
 
 class DoctorMainScreen extends StatefulWidget {
   const DoctorMainScreen({super.key});
@@ -129,19 +129,28 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+    final BoxDecoration backgroundDecoration = isDarkMode
+        ? const BoxDecoration(color: Colors.black)
+        : const BoxDecoration(gradient: AppTheme.lightGradient);
+    final Color navBackground = theme.cardColor;
+    final Color navShadow = Colors.black.withOpacity(isDarkMode ? 0.3 : 0.05);
+    final Color selectedColor =
+        isDarkMode ? AppTheme.cyan100 : AppTheme.teal600;
+    final Color unselectedColor =
+        isDarkMode ? Colors.white70 : AppTheme.gray500;
+    final Color highlightColor =
+        isDarkMode ? Colors.white.withOpacity(0.08) : AppTheme.teal50;
+
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.lightGradient,
-        ),
-        child: _screens[_currentIndex],
-      ),
+      body: _screens[_currentIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: navBackground,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: navShadow,
               blurRadius: 10,
             ),
           ],
@@ -152,10 +161,46 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             child: Row(
               children: [
-                Expanded(child: _buildNavItem(0, Icons.dashboard, 'Dashboard')),
-                Expanded(child: _buildNavItem(1, Icons.article, 'Advice')),
-                Expanded(child: _buildNavItem(2, Icons.chat, 'Chat')),
-                Expanded(child: _buildNavItem(3, Icons.person, 'Profile')),
+                Expanded(
+                  child: _buildNavItem(
+                    0,
+                    Icons.dashboard,
+                    'Dashboard',
+                    selectedColor,
+                    unselectedColor,
+                    highlightColor,
+                  ),
+                ),
+                Expanded(
+                  child: _buildNavItem(
+                    1,
+                    Icons.article,
+                    'Advice',
+                    selectedColor,
+                    unselectedColor,
+                    highlightColor,
+                  ),
+                ),
+                Expanded(
+                  child: _buildNavItem(
+                    2,
+                    Icons.chat,
+                    'Chat',
+                    selectedColor,
+                    unselectedColor,
+                    highlightColor,
+                  ),
+                ),
+                Expanded(
+                  child: _buildNavItem(
+                    3,
+                    Icons.person,
+                    'Profile',
+                    selectedColor,
+                    unselectedColor,
+                    highlightColor,
+                  ),
+                ),
               ],
             ),
           ),
@@ -164,7 +209,14 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label) {
+  Widget _buildNavItem(
+    int index,
+    IconData icon,
+    String label,
+    Color selectedColor,
+    Color unselectedColor,
+    Color highlightColor,
+  ) {
     final isSelected = _currentIndex == index;
 
     return Material(
@@ -177,7 +229,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? AppTheme.teal50 : Colors.transparent,
+            color: isSelected ? highlightColor : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -186,7 +238,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
             children: [
               Icon(
                 icon,
-                color: isSelected ? AppTheme.teal600 : AppTheme.gray500,
+                color: isSelected ? selectedColor : unselectedColor,
                 size: 22,
               ),
               const SizedBox(height: 4),
@@ -194,7 +246,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
                 label,
                 style: TextStyle(
                   fontSize: 10,
-                  color: isSelected ? AppTheme.teal600 : AppTheme.gray500,
+                  color: isSelected ? selectedColor : unselectedColor,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
