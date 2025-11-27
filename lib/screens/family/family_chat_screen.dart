@@ -132,7 +132,6 @@ class _FamilyChatScreenState extends State<FamilyChatScreen> {
                   style: TextStyle(fontSize: 20, color: Colors.black26),
                   textAlign: TextAlign.center),
             ),
-            swapCategoryAndBottomBar: false,
             skinToneConfig: SkinToneConfig(enabled: false),
             categoryViewConfig: CategoryViewConfig(
               iconColor: AppTheme.gray500,

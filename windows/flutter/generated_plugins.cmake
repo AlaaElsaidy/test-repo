@@ -6,8 +6,11 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   emoji_picker_flutter
   file_selector_windows
+  flutter_tts
   geolocator_windows
+  record_windows
   share_plus
+  speech_to_text_windows
   url_launcher_windows
 )
 

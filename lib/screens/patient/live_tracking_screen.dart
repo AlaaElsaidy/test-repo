@@ -12,10 +12,14 @@ import '../../core/supabase/location-tracking-service.dart';
 import '../../core/supabase/safe-zone-service.dart';
 import '../../core/supabase/supabase-service.dart';
 import '../../core/supabase/patient-family-service.dart';
+import '../../services/lobna/lobna_voice_controller.dart';
+import '../../services/lobna/scenario_engine.dart';
 import '../../theme/app_theme.dart';
 
 class LiveTrackingScreen extends StatefulWidget {
-  const LiveTrackingScreen({super.key});
+  const LiveTrackingScreen({super.key, this.voiceController});
+
+  final LobnaVoiceController? voiceController;
 
   @override
   State<LiveTrackingScreen> createState() => _LiveTrackingScreenState();
@@ -37,13 +41,20 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   final SafeZoneService _safeZoneService = SafeZoneService();
   final PatientService _patientService = PatientService();
   final PatientFamilyService _patientFamilyService = PatientFamilyService();
+  LobnaScenarioEngine? _scenarioEngine;
 
   // Safe Zones from database
   List<SafeZone> _safeZones = [];
+  String? _patientName;
+  String? _familyContactName;
 
   @override
   void initState() {
     super.initState();
+    final voiceController = widget.voiceController;
+    if (voiceController != null) {
+      _scenarioEngine = LobnaScenarioEngine(voiceController: voiceController);
+    }
     _initData();
   }
 
@@ -67,6 +78,10 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     String? patientId;
     
     if (patient != null) {
+      final name = patient['name'] as String?;
+      if (name != null && name.trim().isNotEmpty) {
+        setState(() => _patientName = name);
+      }
       patientId = patient['id'] as String?;
       setState(() => _patientId = patientId);
       
@@ -77,10 +92,17 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
           final relations = await _patientFamilyService.getFamilyMembersByPatient(patientId);
           if (relations.isNotEmpty) {
             final firstRelation = relations.first;
-            final familyMember = firstRelation['family_members'] as Map<String, dynamic>?;
+            final familyMember =
+                firstRelation['family_members'] as Map<String, dynamic>?;
             familyPhone = familyMember?['phone'] as String?;
             if (familyPhone != null && familyPhone.trim().isNotEmpty) {
               setState(() => _emergencyPhone = familyPhone);
+            }
+            final contactName = familyMember?['full_name'] ??
+                familyMember?['name'] ??
+                firstRelation['full_name'];
+            if (contactName != null && contactName.toString().trim().isNotEmpty) {
+              setState(() => _familyContactName = contactName.toString().trim());
             }
           }
         } catch (e) {
@@ -213,6 +235,20 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         );
       });
 
+      if (_scenarioEngine != null) {
+        final alertResult = await _scenarioEngine!.handleLocationStatus(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          zones: _safeZones,
+          patientId: _patientId,
+          locationHint: addr,
+          familyContactName: _familyContactName,
+        );
+        if (alertResult.triggeredChange && !alertResult.isInside) {
+          await _notifyFamilyUnsafe(alertResult);
+        }
+      }
+
       _animateCameraToCurrentLocation();
     } catch (e) {
       if (mounted) {
@@ -221,6 +257,45 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         );
       }
       setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _notifyFamilyUnsafe(SafeZoneAlertResult result) async {
+    if (_emergencyPhone == null || _emergencyPhone!.isEmpty) {
+      return;
+    }
+
+    final lat = _pos?.latitude;
+    final lng = _pos?.longitude;
+    final mapsLink = (lat != null && lng != null)
+        ? 'https://www.google.com/maps/?q=$lat,$lng'
+        : '';
+    final familyLabel = _familyContactName ?? 'العيلة';
+    final patientLabel = _patientName ?? 'المريض';
+    final body =
+        'تنبيه أمان: $patientLabel خرج برّه المكان الآمن قريب من ${result.locationHint ?? 'موقعه الحالي'}. ما تقلقوش، بعتّلكم موقعه دلوقتي. $mapsLink';
+
+    bool openedWhatsApp = false;
+    try {
+      openedWhatsApp = await _openWhatsApp(_emergencyPhone!, body);
+    } catch (_) {
+      openedWhatsApp = false;
+    }
+
+    if (!openedWhatsApp) {
+      await _openSMS(_emergencyPhone!, body);
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            openedWhatsApp
+                ? 'بلغت $familyLabel على واتساب بالموقع.'
+                : 'ببعت رسالة نصية لـ $familyLabel بالموقع.',
+          ),
+        ),
+      );
     }
   }
 

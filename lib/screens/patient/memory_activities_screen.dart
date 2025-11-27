@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../core/shared-prefrences/shared-prefrences-helper.dart';
 import '../../core/supabase/activity-service.dart';
 import '../../core/supabase/supabase-service.dart';
+import '../../services/lobna/activity_reminder_service.dart';
 
 // Colors/Gradient
 const Color kTeal900 = Color(0xFF134E4A);
@@ -27,6 +28,8 @@ class MemoryActivitiesScreen extends StatefulWidget {
 class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
   final ActivityService _activityService = ActivityService();
   final PatientService _patientService = PatientService();
+  final ActivityReminderService _reminderService =
+      ActivityReminderService.instance;
   
   List<Map<String, dynamic>> activities = [];
   bool _loading = true;
@@ -83,7 +86,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
         DateTime? date;
         try {
           if (activity['scheduled_date'] != null) {
-            date = DateTime.parse(activity['scheduled_date']);
+            date = DateTime.parse(activity['scheduled_date']).toLocal();
           }
         } catch (e) {
           date = DateTime.now();
@@ -102,6 +105,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
           'done': activity['is_done'] ?? false,
           'date': date ?? DateTime.now(),
           'time': timeStr,
+          'time24': activity['scheduled_time'] ?? '08:00',
           'reminderType': activity['reminder_type'] ?? 'alarm',
         };
       }).toList();
@@ -110,6 +114,8 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
         activities = transformedActivities;
         _loading = false;
       });
+
+      await _queueReminders(transformedActivities);
     } catch (e) {
       setState(() {
         _error = 'Failed to load activities: $e';
@@ -153,6 +159,21 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
     list.sort((a, b) =>
         ((a['time'] ?? '') as String).compareTo((b['time'] ?? '') as String));
     return list;
+  }
+
+  Future<void> _queueReminders(
+      List<Map<String, dynamic>> transformedActivities) async {
+    try {
+      final reminders = transformedActivities
+          .map((activity) => ActivityReminder.fromActivityMap(activity))
+          .toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
+
+      final upcoming = reminders.take(5).toList();
+      await _reminderService.syncReminders(upcoming);
+    } catch (e) {
+      debugPrint('Failed to schedule reminders: $e');
+    }
   }
 
   @override

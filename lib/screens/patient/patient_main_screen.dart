@@ -1,6 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../core/shared-prefrences/shared-prefrences-helper.dart';
+import '../../services/lobna/lobna_voice_controller.dart';
+import '../../services/lobna/activity_reminder_service.dart';
+import '../../services/lobna/prompts/lobna_dialect_adapter.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/lobna_listen_button.dart';
+import '../services/chat_manager.dart';
+import 'lobna_text_chat_screen.dart';
 import 'chat_with_doctor_screen.dart';
 import 'live_tracking_screen.dart';
 import 'memory_activities_screen.dart';
@@ -17,39 +26,52 @@ class PatientMainScreen extends StatefulWidget {
 class _PatientMainScreenState extends State<PatientMainScreen> {
   int _currentIndex = 0;
 
-  // ADDED: نموذج مريض تجريبي — تقدري تبدّليه بأي بيانات حقيقية أو توصليه بـ Provider/API
-  late final Patient _patient;
+  // Initialize immediately - no late variables
+  final Patient _patient = const Patient(
+    name: 'Margaret Smith',
+    age: 72,
+    phone: '+1 (555) 123-4567',
+    email: 'margaret.smith@email.com',
+    address: '123 Oak Street, Springfield',
+    emergencyContact: EmergencyContact(
+      name: 'Emily Smith',
+      relation: 'Daughter',
+      phone: '+1 (555) 987-6543',
+    ),
+  );
 
-  // CHANGED: بدل ما تبقى قائمة ثابتة، هنجهّزها في initState بعد بناء المريض
+  // Initialize immediately - no late variables
+  final LobnaVoiceController _voiceController = LobnaVoiceController();
+  final ChatManager _chatManager = ChatManager();
+  final ActivityReminderService _reminderService =
+      ActivityReminderService.instance;
+  static const _lobnaChatId = 'lobna-lenny-thread';
+
+  // Initialize screens in initState - late final ensures initialization happens after constructor
   late final List<Widget> _screens;
+  StreamSubscription<ActivityReminder>? _reminderSub;
 
   @override
   void initState() {
     super.initState();
-
-    // ADDED: بيانات مريض افتراضية
-    _patient = const Patient(
-      name: 'Margaret Smith',
-      age: 72,
-      // مش بتظهر في الـ UI
-      phone: '+1 (555) 123-4567',
-      email: 'margaret.smith@email.com',
-      address: '123 Oak Street, Springfield',
-      emergencyContact: EmergencyContact(
-        name: 'Emily Smith',
-        relation: 'Daughter',
-        phone: '+1 (555) 987-6543',
-      ),
-    );
-
-    // ADDED: بناء الشاشات وتمرير المريض للبروفايل
+    // Build screens in initState after super.initState() to ensure all dependencies are ready
+    // This guarantees _voiceController and _patient are fully initialized
     _screens = [
       const PatientDashboard(),
       const MemoryActivitiesScreen(),
-      const LiveTrackingScreen(),
+      LiveTrackingScreen(voiceController: _voiceController),
       const ChatWithDoctorScreen(),
-      PatientProfileScreen(patient: _patient), // ADDED: تمرير patient
+      PatientProfileScreen(patient: _patient),
     ];
+
+    _reminderSub = _reminderService.onReminderDue.listen(_handleReminderTrigger);
+  }
+
+  @override
+  void dispose() {
+    _reminderSub?.cancel();
+    _voiceController.dispose();
+    super.dispose();
   }
 
   @override
@@ -60,6 +82,7 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
           gradient: AppTheme.lightGradient,
         ),
         // CHANGED: IndexedStack لحفظ حالة كل تبويب بدل ما يعاد بناؤه كل مرة
+        // _screens is guaranteed to be initialized in initState() before build() is called
         child: IndexedStack(
           index: _currentIndex,
           children: _screens,
@@ -70,7 +93,7 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -90,6 +113,94 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
               ],
             ),
           ),
+        ),
+      ),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            heroTag: 'lobnaTextChat',
+            mini: true,
+            onPressed: _openTextChat,
+            child: const Icon(Icons.chat),
+          ),
+          const SizedBox(height: 12),
+          LobnaListenButton(
+            controller: _voiceController,
+            onTranscript: _handleTranscript,
+            onReplyRequested: _handleAssistantReply,
+            chatManager: _chatManager,
+            chatId: _lobnaChatId,
+            patientId: SharedPrefsHelper.getString("patientUid") ?? 
+                      SharedPrefsHelper.getString("userId"),
+          ),
+        ],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
+
+  void _handleTranscript(String text) {
+    _chatManager.addMessage(
+      _lobnaChatId,
+      ChatMessage(
+        sender: 'patient',
+        text: text,
+        time: _chatManager.getCurrentTime(),
+      ),
+    );
+  }
+
+  Future<String?> _handleAssistantReply(String transcript) async {
+    final reply = await _voiceController.generateAssistantReply(transcript);
+    _chatManager.addMessage(
+      _lobnaChatId,
+      ChatMessage(
+        sender: 'lobna',
+        text: reply,
+        time: _chatManager.getCurrentTime(),
+      ),
+    );
+    return reply;
+  }
+
+  Future<void> _handleReminderTrigger(ActivityReminder reminder) async {
+    // تحسين النص باللهجة المصرية
+    final timeParts = reminder.time24h.split(':');
+    final hour = timeParts.isNotEmpty ? int.tryParse(timeParts[0]) ?? 8 : 8;
+    final minute = timeParts.length > 1 ? int.tryParse(timeParts[1]) ?? 0 : 0;
+    final time12h = hour > 12 
+        ? '${hour - 12}:${minute.toString().padLeft(2, '0')}'
+        : '$hour:${minute.toString().padLeft(2, '0')}';
+    final amPm = hour >= 12 ? 'بعد الظهر' : 'الصبح';
+    
+    final bodyText = reminder.body.isNotEmpty 
+        ? reminder.body 
+        : 'لو سمحت استعد للنشاط دلوقتي.';
+    
+    final message = LobnaDialectAdapter.ensureMasri(
+        'عندنا نشاط دلوقتي! النشاط "$reminder.title" هيبدأ الساعة $time12h $amPm. $bodyText');
+    
+    _chatManager.addMessage(
+      _lobnaChatId,
+      ChatMessage(
+        sender: 'lobna',
+        text: message,
+        time: _chatManager.getCurrentTime(),
+      ),
+    );
+    await _voiceController.speak(message);
+  }
+
+  void _openTextChat() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LobnaTextChatScreen(
+          chatManager: _chatManager,
+          voiceController: _voiceController,
+          chatId: _lobnaChatId,
+          patientId: SharedPrefsHelper.getString("patientUid") ??
+              SharedPrefsHelper.getString("userId"),
         ),
       ),
     );
