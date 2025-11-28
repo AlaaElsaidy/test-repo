@@ -21,10 +21,12 @@ class ActivityReminderService {
 
   static const String _taskName = 'activityReminderTask';
   static const Duration _checkInterval = Duration(minutes: 5);
-  static const Duration _reminderBeforeActivity = Duration(minutes: 30);
+  // لم يعد هناك تذكير قبل المعاد – هنذكّر عند المعاد تقريباً
   static const Duration _missedActivityThreshold = Duration(minutes: 15); // إذا فات 15 دقيقة ولم يُنجز
 
   /// Initialize the service
+  /// ملاحظة: في هذا الإصدار نستخدم التذكير في الـ foreground فقط.
+  /// يتم استدعاء checkAndRemind يدوياً من شاشة الأنشطة، ولا نعتمد على Workmanager.
   Future<void> initialize() async {
     // Initialize TTS
     await _ttsService.initialize();
@@ -40,26 +42,17 @@ class ActivityReminderService {
     // Request notification permissions
     await _requestNotificationPermissions();
 
-    // Initialize Workmanager
-    await Workmanager().initialize(
-      callbackDispatcher,
-      isInDebugMode: kDebugMode,
-    );
-
-    // Register periodic task
-    await _registerPeriodicTask();
+    // حاول إلغاء أي tasks قديمة من Workmanager (إن وُجدت)، لتفادي تشغيل خلفي غير مدعوم
+    try {
+      await Workmanager().cancelByUniqueName(_taskName);
+    } catch (_) {
+      // نتجاهل أي أخطاء هنا
+    }
   }
 
-  /// Register periodic task to check activities
+  /// لم نعد نستخدم Workmanager للتذكير بالدورية – تُركت الدالة للمرجع فقط ولا يتم استدعاؤها.
   Future<void> _registerPeriodicTask() async {
-    await Workmanager().registerPeriodicTask(
-      _taskName,
-      _taskName,
-      frequency: _checkInterval,
-      constraints: Constraints(
-        networkType: NetworkType.connected,
-      ),
-    );
+    // intentionally empty – foreground-only mode
   }
 
   /// Request notification permissions
@@ -140,9 +133,9 @@ class ActivityReminderService {
           final activityName = activity['name'] as String? ?? 'نشاط';
           final activityId = activity['id'] as String?;
 
-          // Check if activity is within reminder window (upcoming)
-          if (timeUntilActivity <= _reminderBeforeActivity &&
-              timeUntilActivity.inMinutes >= 0) {
+          // Reminder قريب من وقت النشاط (قبل أو بعده بعدة دقائق فقط)
+          // نستخدم نافذة زمنية قدرها _checkInterval لتفادى مشاكل زمن التايمر
+          if (timeUntilActivity.inMinutes.abs() < _checkInterval.inMinutes) {
             await _sendReminder(patientName, activityName, scheduledDateTime);
           }
 
@@ -205,14 +198,17 @@ class ActivityReminderService {
   /// Send reminder notification and TTS
   Future<void> _sendReminder(
       String patientName, String activityName, DateTime scheduledTime) async {
-    // Format time
-    final hour = scheduledTime.hour;
-    final minute = scheduledTime.minute.toString().padLeft(2, '0');
+    // نستخدم الوقت الحالى من جهاز المريض لنعبر عن "الساعة دلوقتي"
+    final now = DateTime.now();
+    final hour = now.hour;
+    final minute = now.minute.toString().padLeft(2, '0');
     final period = hour >= 12 ? 'مساءً' : 'صباحاً';
     final hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
 
-    // New message format: "ع المعاد بتاعه" + activity name
-    final message = 'ع المعاد بتاعه، عندك $activityName الساعة $hour12:$minute $period';
+    // صياغة أوضح للصوت: "يا [الاسم]، متنسيش [النشاط]. الساعة دلوقتي [الوقت]."
+    final displayName = patientName.isNotEmpty ? patientName : 'حبيبتي';
+    final message =
+        'يا $displayName، متنسيش $activityName. الساعة دلوقتي $hour12:$minute $period.';
 
     // Send notification
     await _showNotification(activityName, message);

@@ -125,6 +125,8 @@ class _FamilyMainScreenState extends State<FamilyMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.of(context).textScaleFactor.clamp(0.8, 1.2);
+
     return NotificationListenerWidget(
       showSnackBar: true,
       showDialog: true,
@@ -155,11 +157,11 @@ class _FamilyMainScreenState extends State<FamilyMainScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.home, 'Home'),
-                _buildNavItem(1, Icons.location_on, 'Tracking'),
-                _buildNavItem(4, Icons.psychology, 'Activities'),
-                _buildNavItem(2, Icons.chat, 'Chat'),
-                _buildNavItem(3, Icons.person, 'Profile'),
+                _buildNavItem(0, Icons.home, 'Home', textScale),
+                _buildNavItem(1, Icons.location_on, 'Tracking', textScale),
+                _buildNavItem(4, Icons.psychology, 'Activities', textScale),
+                _buildNavItem(2, Icons.chat, 'Chat', textScale),
+                _buildNavItem(3, Icons.person, 'Profile', textScale),
               ],
             ),
           ),
@@ -169,7 +171,12 @@ class _FamilyMainScreenState extends State<FamilyMainScreen> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label) {
+  Widget _buildNavItem(
+    int index,
+    IconData icon,
+    String label,
+    double textScale,
+  ) {
     final isSelected = _currentIndex == index;
 
     return InkWell(
@@ -187,15 +194,19 @@ class _FamilyMainScreenState extends State<FamilyMainScreen> {
             Icon(
               icon,
               color: isSelected ? AppTheme.teal600 : AppTheme.gray500,
-              size: 24,
+              size: 22 * textScale,
             ),
             const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: isSelected ? AppTheme.teal600 : AppTheme.gray500,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10 * textScale,
+                  color: isSelected ? AppTheme.teal600 : AppTheme.gray500,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
               ),
             ),
           ],

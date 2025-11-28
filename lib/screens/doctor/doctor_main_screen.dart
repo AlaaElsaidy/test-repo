@@ -129,6 +129,8 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.of(context).textScaleFactor.clamp(0.8, 1.2);
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -152,10 +154,42 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             child: Row(
               children: [
-                Expanded(child: _buildNavItem(0, Icons.dashboard, 'Dashboard')),
-                Expanded(child: _buildNavItem(1, Icons.article, 'Advice')),
-                Expanded(child: _buildNavItem(2, Icons.chat, 'Chat')),
-                Expanded(child: _buildNavItem(3, Icons.person, 'Profile')),
+                Expanded(
+                  child: _buildNavItem(
+                    context,
+                    0,
+                    Icons.dashboard,
+                    'Dashboard',
+                    textScale,
+                  ),
+                ),
+                Expanded(
+                  child: _buildNavItem(
+                    context,
+                    1,
+                    Icons.article,
+                    'Advice',
+                    textScale,
+                  ),
+                ),
+                Expanded(
+                  child: _buildNavItem(
+                    context,
+                    2,
+                    Icons.chat,
+                    'Chat',
+                    textScale,
+                  ),
+                ),
+                Expanded(
+                  child: _buildNavItem(
+                    context,
+                    3,
+                    Icons.person,
+                    'Profile',
+                    textScale,
+                  ),
+                ),
               ],
             ),
           ),
@@ -164,7 +198,13 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label) {
+  Widget _buildNavItem(
+    BuildContext context,
+    int index,
+    IconData icon,
+    String label,
+    double textScale,
+  ) {
     final isSelected = _currentIndex == index;
 
     return Material(
@@ -187,15 +227,20 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
               Icon(
                 icon,
                 color: isSelected ? AppTheme.teal600 : AppTheme.gray500,
-                size: 22,
+                size: 20 * textScale,
               ),
               const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isSelected ? AppTheme.teal600 : AppTheme.gray500,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9 * textScale,
+                    color: isSelected ? AppTheme.teal600 : AppTheme.gray500,
+                    fontWeight:
+                        isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
                 ),
               ),
             ],

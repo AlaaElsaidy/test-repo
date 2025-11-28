@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/shared-prefrences/shared-prefrences-helper.dart';
 import '../../core/supabase/activity-service.dart';
 import '../../core/supabase/supabase-service.dart';
+import '../../core/supabase/notification-service.dart';
 import '../../ai/activity_reminder_service.dart';
 
 // Colors/Gradient
@@ -29,10 +31,14 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
   final ActivityService _activityService = ActivityService();
   final PatientService _patientService = PatientService();
   final ActivityReminderService _reminderService = ActivityReminderService();
+  final NotificationService _notificationService = NotificationService();
   
   List<Map<String, dynamic>> activities = [];
   bool _loading = true;
   String? _error;
+  Timer? _reminderTimer;
+  String? _patientId;
+  String? _patientName;
 
   // Week state
   DateTime _weekStart = _startOfWeek(DateTime.now());
@@ -47,10 +53,22 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
 
   Future<void> _initializeReminders() async {
     await _reminderService.initialize();
+
+    // نستخدم تايمر بسيط في الـ foreground لاستدعاء التذكير كل 5 دقائق
+    _reminderTimer?.cancel();
+
+    // أول فحص فورى عند فتح الشاشة (للتعامل مع الأنشطة القريبة جداً من الوقت الحالي)
+    unawaited(_reminderService.checkAndRemind());
+
+    _reminderTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => _reminderService.checkAndRemind(),
+    );
   }
 
   @override
   void dispose() {
+    _reminderTimer?.cancel();
     _reminderService.dispose();
     super.dispose();
   }
@@ -86,6 +104,10 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
       }
 
       final patientId = patientRecord['id'] as String;
+      final patientName = patientRecord['name'] as String?;
+
+      _patientId = patientId;
+      _patientName = patientName;
 
       // Fetch all activities for this patient
       final fetchedActivities = await _activityService.getActivitiesByPatient(patientId);
@@ -170,25 +192,51 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final width = media.size.width;
+    final isSmall = width < 360;
+
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SizedBox(
+              width: isSmall ? 32 : 40,
+              height: isSmall ? 32 : 40,
+              child: const CircularProgressIndicator(),
+            ),
+          ),
+        ),
       );
     }
 
     if (_error != null) {
       return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(_error!, style: const TextStyle(color: Colors.red)),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadActivities,
-                child: const Text('Retry'),
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isSmall ? 16 : 24,
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: isSmall ? double.infinity : 160,
+                    child: ElevatedButton(
+                      onPressed: _loadActivities,
+                      child: const Text('Retry'),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       );
@@ -207,208 +255,271 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
 
     return DefaultTabController(
       length: 2,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with refresh button
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final hPadding = constraints.maxWidth < 360 ? 12.0 : 16.0;
+            final titleSize = constraints.maxWidth < 360 ? 20.0 : 24.0;
+            final subtitleSize = constraints.maxWidth < 360 ? 12.0 : 14.0;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Memory Activities',
-                      style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: kTeal900)),
-                  SizedBox(height: 4),
-                  Text('Keep your mind active and engaged',
-                      style: TextStyle(fontSize: 14, color: kGray600)),
-                ]),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: _loadActivities,
-                      tooltip: 'Refresh',
-                    ),
-                    const SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                            gradient: kTealGradient, shape: BoxShape.circle),
-                        child:
-                            Icon(Icons.auto_awesome, color: Colors.white, size: 24),
+                // Header with refresh button
+                Padding(
+                  padding: EdgeInsets.all(hPadding),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Memory Activities',
+                              style: TextStyle(
+                                fontSize: titleSize,
+                                fontWeight: FontWeight.bold,
+                                color: kTeal900,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Keep your mind active and engaged',
+                              style: TextStyle(
+                                fontSize: subtitleSize,
+                                color: kGray600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Tab bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(12)),
-              child: const TabBar(
-                indicator: BoxDecoration(
-                    gradient: kTealGradient,
-                    borderRadius: BorderRadius.all(Radius.circular(12))),
-                indicatorSize: TabBarIndicatorSize.tab,
-                labelColor: Colors.white,
-                unselectedLabelColor: kGray600,
-                tabs: [
-                  Tab(text: 'Today'),
-                  Tab(text: 'Schedule'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Tab views
-          Expanded(
-            child: TabBarView(
-              children: [
-                // Today
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      _ProgressCard(
-                          done: todayDone,
-                          total: todayTotal,
-                          progress: todayProgress),
-                      const SizedBox(height: 16),
-                      Expanded(child: _buildPatientList(todayList)),
-                    ],
-                  ),
-                ),
-
-                // Schedule
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
+                      const SizedBox(width: 8),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.arrow_back_ios),
-                            onPressed: () {
-                              setState(() {
-                                final idx = _weekDays.indexWhere(
-                                    (d) => _fmt(d) == _fmt(_selectedDay));
-                                _weekStart = _weekStart
-                                    .subtract(const Duration(days: 7));
-                                _selectedDay = _weekStart
-                                    .add(Duration(days: idx < 0 ? 0 : idx));
-                              });
-                            },
+                            icon: const Icon(Icons.refresh),
+                            onPressed: _loadActivities,
+                            tooltip: 'Refresh',
                           ),
-                          Text(
-                            "${DateFormat('MMM d').format(_weekDays.first)} - ${DateFormat('MMM d').format(_weekDays.last)}",
-                            style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: kTeal900),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.arrow_forward_ios),
-                            onPressed: () {
-                              setState(() {
-                                final idx = _weekDays.indexWhere(
-                                    (d) => _fmt(d) == _fmt(_selectedDay));
-                                _weekStart =
-                                    _weekStart.add(const Duration(days: 7));
-                                _selectedDay = _weekStart
-                                    .add(Duration(days: idx < 0 ? 0 : idx));
-                              });
-                            },
+                          SizedBox(
+                            width: constraints.maxWidth < 360 ? 40 : 48,
+                            height: constraints.maxWidth < 360 ? 40 : 48,
+                            child: const DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: kTealGradient,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.auto_awesome,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 96,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _weekDays.length,
-                          itemBuilder: (context, i) {
-                            final day = _weekDays[i];
-                            final isSelected = _fmt(day) == _fmt(_selectedDay);
-                            return GestureDetector(
-                              onTap: () => setState(() => _selectedDay = day),
-                              child: Container(
-                                width: 80,
-                                margin:
-                                    const EdgeInsets.symmetric(horizontal: 6),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 10, horizontal: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? kTeal500 : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color: const Color(0xFFE5E7EB)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color: Colors.black.withOpacity(0.02),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2))
-                                  ],
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(DateFormat('EEE').format(day),
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: isSelected
-                                                ? Colors.white
-                                                : Colors.black)),
-                                    const SizedBox(height: 6),
-                                    Text(DateFormat('d').format(day),
-                                        style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: isSelected
-                                                ? Colors.white
-                                                : Colors.black)),
-                                    const SizedBox(height: 4),
-                                    Text(DateFormat('MMM').format(day),
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            color: isSelected
-                                                ? Colors.white
-                                                : kGray600)),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
+                    ],
+                  ),
+                ),
+
+                // Tab bar
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: hPadding),
+                  child: Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const TabBar(
+                      indicator: BoxDecoration(
+                        gradient: kTealGradient,
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: kGray600,
+                      tabs: [
+                        Tab(text: 'Today'),
+                        Tab(text: 'Schedule'),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Tab views
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      // Today
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: hPadding),
+                        child: Column(
+                          children: [
+                            _ProgressCard(
+                              done: todayDone,
+                              total: todayTotal,
+                              progress: todayProgress,
+                            ),
+                            const SizedBox(height: 16),
+                            Expanded(child: _buildPatientList(todayList)),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      _ProgressCard(
-                          done: selectedDone,
-                          total: selectedTotal,
-                          progress: selectedProgress),
-                      const SizedBox(height: 12),
-                      Expanded(child: _buildPatientList(selectedList)),
+
+                      // Schedule
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: hPadding),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_back_ios),
+                                  onPressed: () {
+                                    setState(() {
+                                      final idx = _weekDays.indexWhere(
+                                        (d) => _fmt(d) == _fmt(_selectedDay),
+                                      );
+                                      _weekStart = _weekStart
+                                          .subtract(const Duration(days: 7));
+                                      _selectedDay = _weekStart.add(
+                                        Duration(days: idx < 0 ? 0 : idx),
+                                      );
+                                    });
+                                  },
+                                ),
+                                Flexible(
+                                  child: Text(
+                                    "${DateFormat('MMM d').format(_weekDays.first)} - ${DateFormat('MMM d').format(_weekDays.last)}",
+                                    textAlign: TextAlign.center,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: kTeal900,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_forward_ios),
+                                  onPressed: () {
+                                    setState(() {
+                                      final idx = _weekDays.indexWhere(
+                                        (d) => _fmt(d) == _fmt(_selectedDay),
+                                      );
+                                      _weekStart = _weekStart
+                                          .add(const Duration(days: 7));
+                                      _selectedDay = _weekStart.add(
+                                        Duration(days: idx < 0 ? 0 : idx),
+                                      );
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              height: 96,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _weekDays.length,
+                                itemBuilder: (context, i) {
+                                  final day = _weekDays[i];
+                                  final isSelected =
+                                      _fmt(day) == _fmt(_selectedDay);
+                                  return GestureDetector(
+                                    onTap: () =>
+                                        setState(() => _selectedDay = day),
+                                    child: Container(
+                                      width: 80,
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                        horizontal: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? kTeal500
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: const Color(0xFFE5E7EB),
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black
+                                                .withOpacity(0.02),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            DateFormat('EEE').format(day),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : Colors.black,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            DateFormat('d').format(day),
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : Colors.black,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            DateFormat('MMM').format(day),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : kGray600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _ProgressCard(
+                              done: selectedDone,
+                              total: selectedTotal,
+                              progress: selectedProgress,
+                            ),
+                            const SizedBox(height: 12),
+                            Expanded(child: _buildPatientList(selectedList)),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -451,6 +562,24 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                       activities[idx]['done'] = newDoneStatus;
                     }
                   });
+
+                  // إذا تم إنجاز النشاط، ابعث تنبيه للفاميلي
+                  if (newDoneStatus && _patientId != null) {
+                    final patientName = _patientName ?? 'المريض';
+                    final activityName = (activity['name'] ?? '') as String;
+
+                    await _notificationService.sendNotificationToFamily(
+                      patientId: _patientId!,
+                      type: NotificationType.activityCompleted,
+                      title: 'إنجاز نشاط',
+                      message: '$patientName أنجز نشاط "$activityName" بنجاح.',
+                      data: {
+                        'activity_id': activityId,
+                        'activity_name': activityName,
+                        'completed_at': DateTime.now().toIso8601String(),
+                      },
+                    );
+                  }
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(

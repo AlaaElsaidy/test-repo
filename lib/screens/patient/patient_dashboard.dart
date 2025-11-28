@@ -5,6 +5,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart'; // ADDED
 
+import '../../core/shared-prefrences/shared-prefrences-helper.dart';
+import '../../core/supabase/supabase-service.dart';
 import '../../theme/app_theme.dart';
 
 class PatientDashboard extends StatefulWidget {
@@ -45,10 +47,16 @@ class _PatientDashboardState extends State<PatientDashboard> {
   final ImagePicker _picker = ImagePicker(); // ADDED
   File? _avatarFile; // ADDED
 
+  // Patient info from Supabase
+  String? _patientName;
+  String? _patientPhotoUrl;
+  bool _loadingPatient = false;
+
   @override
   void initState() {
     super.initState();
     _initGame();
+    _loadPatientInfo();
   }
 
   @override
@@ -61,6 +69,41 @@ class _PatientDashboardState extends State<PatientDashboard> {
     _previewTimer?.cancel();
     _previewCountdown?.cancel();
     _gameTimer?.cancel();
+  }
+
+  Future<void> _loadPatientInfo() async {
+    _loadingPatient = true;
+    try {
+      final patientUid = SharedPrefsHelper.getString("patientUid") ??
+          SharedPrefsHelper.getString("userId");
+      if (patientUid == null) {
+        _loadingPatient = false;
+        return;
+      }
+
+      final patientService = PatientService();
+      final userService = UserService();
+
+      final patientMap = await patientService.getPatientByUserId(patientUid);
+      final userMap = await userService.getUser(patientUid);
+
+      final String? patientName = patientMap?['name'] as String?;
+      final String? userName = userMap?['name'] as String?;
+      final String? photoUrl = patientMap?['photo_url'] as String?;
+
+      if (!mounted) return;
+      setState(() {
+        _patientName = patientName ?? userName;
+        _patientPhotoUrl = photoUrl;
+        _loadingPatient = false;
+      });
+    } catch (e) {
+      debugPrint('Failed to load patient info for dashboard: $e');
+      if (!mounted) return;
+      setState(() {
+        _loadingPatient = false;
+      });
+    }
   }
 
   void _initGame() {
@@ -275,6 +318,20 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final ImageProvider? avatarImage;
+    if (_avatarFile != null) {
+      avatarImage = FileImage(_avatarFile!);
+    } else if (_patientPhotoUrl != null && _patientPhotoUrl!.isNotEmpty) {
+      if (_patientPhotoUrl!.startsWith('http')) {
+        avatarImage = NetworkImage(_patientPhotoUrl!);
+      } else {
+        final file = File(_patientPhotoUrl!);
+        avatarImage = file.existsSync() ? FileImage(file) : null;
+      }
+    } else {
+      avatarImage = null;
+    }
+
     final cardsCount = _cards.length;
     return SafeArea(
       child: SingleChildScrollView(
@@ -301,10 +358,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         child: CircleAvatar(
                           radius: 28 * _scale,
                           backgroundColor: Colors.white.withOpacity(0.9),
-                          backgroundImage: _avatarFile != null
-                              ? FileImage(_avatarFile!)
-                              : null,
-                          child: _avatarFile == null
+                          backgroundImage: avatarImage,
+                          child: avatarImage == null
                               ? const Icon(Icons.person,
                                   color: AppTheme.teal600, size: 32)
                               : null,
@@ -329,8 +384,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
+                      children: [
+                        const Text(
                           'Hi, Welcome Back',
                           style: TextStyle(
                             color: Colors.white,
@@ -338,10 +393,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
-                          'Margaret Smith',
-                          style: TextStyle(
+                          _patientName ?? ' ',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
                             color: Color(0xFFCFFAFE),
                             fontSize: 14,
                           ),
