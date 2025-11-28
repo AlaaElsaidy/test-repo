@@ -12,6 +12,7 @@ import '../../core/supabase/location-tracking-service.dart';
 import '../../core/supabase/safe-zone-service.dart';
 import '../../core/supabase/supabase-service.dart';
 import '../../core/supabase/patient-family-service.dart';
+import '../../ai/geo_tracking_service.dart';
 import '../../theme/app_theme.dart';
 
 class LiveTrackingScreen extends StatefulWidget {
@@ -37,6 +38,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   final SafeZoneService _safeZoneService = SafeZoneService();
   final PatientService _patientService = PatientService();
   final PatientFamilyService _patientFamilyService = PatientFamilyService();
+  final GeoTrackingService _geoTrackingService = GeoTrackingService();
 
   // Safe Zones from database
   List<SafeZone> _safeZones = [];
@@ -102,11 +104,15 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
 
     // Get current location
     _getCurrentLocation();
+
+    // Start geo tracking service for safe zone monitoring
+    _geoTrackingService.startMonitoring();
   }
 
   @override
   void dispose() {
     _mapController?.dispose();
+    _geoTrackingService.dispose();
     super.dispose();
   }
 

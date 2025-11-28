@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../core/shared-prefrences/shared-prefrences-helper.dart';
 import '../../core/supabase/activity-service.dart';
 import '../../core/supabase/supabase-service.dart';
+import '../../ai/activity_reminder_service.dart';
 
 // Colors/Gradient
 const Color kTeal900 = Color(0xFF134E4A);
@@ -27,6 +28,7 @@ class MemoryActivitiesScreen extends StatefulWidget {
 class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
   final ActivityService _activityService = ActivityService();
   final PatientService _patientService = PatientService();
+  final ActivityReminderService _reminderService = ActivityReminderService();
   
   List<Map<String, dynamic>> activities = [];
   bool _loading = true;
@@ -40,6 +42,17 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
   void initState() {
     super.initState();
     _loadActivities();
+    _initializeReminders();
+  }
+
+  Future<void> _initializeReminders() async {
+    await _reminderService.initialize();
+  }
+
+  @override
+  void dispose() {
+    _reminderService.dispose();
+    super.dispose();
   }
 
   Future<void> _loadActivities() async {

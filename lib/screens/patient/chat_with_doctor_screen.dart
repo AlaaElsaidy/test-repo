@@ -134,7 +134,6 @@ class _ChatWithDoctorScreenState extends State<ChatWithDoctorScreen> {
                 textAlign: TextAlign.center,
               ),
             ),
-            swapCategoryAndBottomBar: false,
             skinToneConfig: SkinToneConfig(enabled: false),
             categoryViewConfig: CategoryViewConfig(
               iconColor: AppTheme.gray500,

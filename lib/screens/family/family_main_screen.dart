@@ -98,6 +98,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import '../../widgets/notification_listener_widget.dart';
 import './family_activities_screen.dart';
 import 'family_chat_screen.dart';
 import 'family_dashboard.dart';
@@ -124,7 +125,14 @@ class _FamilyMainScreenState extends State<FamilyMainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return NotificationListenerWidget(
+      showSnackBar: true,
+      showDialog: true,
+      onNotification: (notification) {
+        // يمكنك إضافة منطق إضافي هنا عند استلام إشعار
+        debugPrint('Received notification: ${notification.type}');
+      },
+      child: Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: AppTheme.lightGradient,
@@ -157,6 +165,7 @@ class _FamilyMainScreenState extends State<FamilyMainScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 

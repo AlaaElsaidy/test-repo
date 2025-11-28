@@ -45,3 +45,11 @@ app.*.map.json
 /android/app/release
 
 docs/*
+
+# Environment variables (API Keys)
+.env
+.env.local
+*.env
+
+# AI Config with API Keys (NEVER commit this!)
+lib/ai/ai_config.dart

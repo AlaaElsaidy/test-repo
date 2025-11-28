@@ -45,8 +45,22 @@
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
+		<!-- Location Permissions -->
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>We use your location to help caregivers track and assist you.</string>
+		<string>نستخدم موقعك لمساعدة القريبين منك في متابعتك والاطمئنان عليك.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>نحتاج الوصول لموقعك في الخلفية لتنبيهك عند الخروج من المنطقة الآمنة.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>نحتاج الوصول لموقعك لتنبيهك عند الخروج من المنطقة الآمنة وإشعار عائلتك.</string>
+		
+		<!-- Microphone Permission (for Speech Recognition) -->
+		<key>NSMicrophoneUsageDescription</key>
+		<string>نحتاج الوصول للميكروفون حتى تتمكن من التحدث مع لبنى المساعد الصوتي.</string>
+		
+		<!-- Speech Recognition Permission -->
+		<key>NSSpeechRecognitionUsageDescription</key>
+		<string>نحتاج إذن التعرف على الكلام لفهم ما تقوله وتقديم المساعدة.</string>
+		
 		<key>LSApplicationQueriesSchemes</key>
 		<array>
 			<string>whatsapp</string>

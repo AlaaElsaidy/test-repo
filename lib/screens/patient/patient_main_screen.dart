@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
-import 'chat_with_doctor_screen.dart';
+import '../../ai/lobna_voice_controller.dart';
+import '../../widgets/lobna_listen_button.dart';
 import 'live_tracking_screen.dart';
 import 'memory_activities_screen.dart';
 import 'patient_dashboard.dart';
-import 'patient_profile_screen.dart'; // ADDED: نحتاجه عشان نمرّر Patient
+import 'patient_profile_screen.dart';
+import 'chat_with_doctor_screen.dart';
+import 'lobna_chat_screen.dart';
 
 class PatientMainScreen extends StatefulWidget {
   const PatientMainScreen({super.key});
@@ -22,10 +25,15 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
 
   // CHANGED: بدل ما تبقى قائمة ثابتة، هنجهّزها في initState بعد بناء المريض
   late final List<Widget> _screens;
+  late final LobnaVoiceController _lobnaController;
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize Lobna controller
+    _lobnaController = LobnaVoiceController();
+    _lobnaController.initialize();
 
     // ADDED: بيانات مريض افتراضية
     _patient = const Patient(
@@ -47,9 +55,24 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
       const PatientDashboard(),
       const MemoryActivitiesScreen(),
       const LiveTrackingScreen(),
-      const ChatWithDoctorScreen(),
+      const ChatWithDoctorScreen(), // الشات القديم مع الدكتور/العيلة
       PatientProfileScreen(patient: _patient), // ADDED: تمرير patient
     ];
+  }
+
+  @override
+  void dispose() {
+    _lobnaController.dispose();
+    super.dispose();
+  }
+
+  void _openLobnaChat() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const LobnaChatScreen(),
+      ),
+    );
   }
 
   @override
@@ -64,6 +87,10 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
           index: _currentIndex,
           children: _screens,
         ),
+      ),
+      floatingActionButton: LobnaListenButton(
+        controller: _lobnaController,
+        onTap: _openLobnaChat,
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
