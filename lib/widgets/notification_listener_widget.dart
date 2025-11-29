@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../core/supabase/notification-service.dart';
 import '../core/shared-prefrences/shared-prefrences-helper.dart';
 import '../theme/app_theme.dart';
@@ -28,13 +29,32 @@ class NotificationListenerWidget extends StatefulWidget {
 class _NotificationListenerWidgetState
     extends State<NotificationListenerWidget> {
   final NotificationService _notificationService = NotificationService();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
   StreamSubscription<AppNotification>? _subscription;
   int _unreadCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _initLocalNotifications();
     _startListening();
+  }
+
+  Future<void> _initLocalNotifications() async {
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosSettings = DarwinInitializationSettings();
+    const initSettings =
+        InitializationSettings(android: androidSettings, iOS: iosSettings);
+
+    await _localNotifications.initialize(initSettings);
+
+    final androidPlugin =
+        _localNotifications.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.requestNotificationsPermission();
+    }
   }
 
   Future<void> _startListening() async {
@@ -65,6 +85,9 @@ class _NotificationListenerWidgetState
     // Call custom handler if provided
     widget.onNotification?.call(notification);
 
+    // Show OS-level local notification (banner + sound) while app is running
+    _showLocalNotification(notification);
+
     // Show snackbar for non-critical notifications
     if (widget.showSnackBar && notification.type != NotificationType.emergency) {
       _showNotificationSnackBar(notification);
@@ -76,6 +99,27 @@ class _NotificationListenerWidgetState
             notification.type == NotificationType.emergency)) {
       _showCriticalNotificationDialog(notification);
     }
+  }
+
+  Future<void> _showLocalNotification(AppNotification notification) async {
+    const androidDetails = AndroidNotificationDetails(
+      'family_notifications',
+      'Family Notifications',
+      channelDescription: 'إشعارات المريض لأفراد العائلة',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+
+    const iosDetails = DarwinNotificationDetails();
+    const details =
+        NotificationDetails(android: androidDetails, iOS: iosDetails);
+
+    await _localNotifications.show(
+      DateTime.now().millisecondsSinceEpoch % 100000,
+      notification.title,
+      notification.message,
+      details,
+    );
   }
 
   void _showNotificationSnackBar(AppNotification notification) {

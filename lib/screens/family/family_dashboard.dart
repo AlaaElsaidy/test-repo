@@ -10,17 +10,34 @@ import 'package:video_player/video_player.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../../theme/app_theme.dart';
+import 'family_notifications_screen.dart';
 
 class FamilyDashboard extends StatelessWidget {
   const FamilyDashboard({super.key});
 
   Future<Map<String, dynamic>?> _loadUserInfo() async {
     try {
-      final userId = SharedPrefsHelper.getString("userId") ?? 
-                     SharedPrefsHelper.getString("familyUid");
+      final userId = SharedPrefsHelper.getString("userId") ??
+          SharedPrefsHelper.getString("familyUid");
       if (userId == null) return null;
       final service = UserService();
-      return await service.getUser(userId);
+      final user = await service.getUser(userId);
+      // حاول تجيب صورة من جدول family_members
+      final client = SupabaseConfig.client;
+      final familyRow = await client
+          .from('family_members')
+          .select('image_url')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (familyRow != null && familyRow['image_url'] != null) {
+        return {
+          ...?user,
+          'image_url': familyRow['image_url'],
+        };
+      }
+
+      return user;
     } catch (e) {
       return null;
     }
@@ -124,7 +141,10 @@ class FamilyDashboard extends StatelessWidget {
                 return FutureBuilder<List<Map<String, dynamic>>>(
                   future: _loadLinkedPatients(),
                   builder: (context, patientsSnapshot) {
-                    final userName = userSnapshot.data?['name'] as String? ?? 'User';
+                    final userName =
+                        userSnapshot.data?['name'] as String? ?? 'User';
+                    final avatarUrl =
+                        userSnapshot.data?['image_url'] as String?;
                     final patients = patientsSnapshot.data ?? [];
                     final firstPatient = patients.isNotEmpty 
                         ? patients.first['patients'] as Map<String, dynamic>?
@@ -141,18 +161,21 @@ class FamilyDashboard extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              Container(
-                                width: 64,
-                                height: 64,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Icon(
-                                  Icons.favorite,
-                                  color: Colors.white,
-                                  size: 32,
-                                ),
+                              CircleAvatar(
+                                radius: 32,
+                                backgroundColor: Colors.white.withOpacity(0.2),
+                                backgroundImage: avatarUrl != null &&
+                                        avatarUrl.isNotEmpty
+                                    ? NetworkImage(avatarUrl)
+                                    : null,
+                                child: (avatarUrl == null ||
+                                        avatarUrl.isEmpty)
+                                    ? const Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                        size: 32,
+                                      )
+                                    : null,
                               ),
                               const SizedBox(width: 16),
                               Expanded(
@@ -181,7 +204,14 @@ class FamilyDashboard extends StatelessWidget {
                                 ),
                               ),
                               IconButton(
-                                onPressed: () {},
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const FamilyNotificationsScreen(),
+                                    ),
+                                  );
+                                },
                                 icon: const Icon(Icons.notifications_outlined),
                                 color: Colors.white,
                                 iconSize: 28,

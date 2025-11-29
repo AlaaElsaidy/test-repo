@@ -143,6 +143,25 @@ class FamilyMemberService {
     await _client.from('family_members').update(data).eq('id', familyId);
   }
 
+  Future<String> uploadFamilyPhoto(String familyId, File imageFile) async {
+    final fileName = 'family_$familyId.jpg';
+    // نستخدم نفس الـ bucket الخاص بصور المرضى للأفاتار
+    final bucket = _client.storage.from('patientImg');
+
+    try {
+      await bucket.remove([fileName]);
+    } catch (_) {}
+
+    await bucket.upload(
+      fileName,
+      imageFile,
+      fileOptions: const FileOptions(upsert: true),
+    );
+
+    final publicUrl = bucket.getPublicUrl(fileName);
+    return publicUrl;
+  }
+
   Future<List<Map<String, dynamic>>> getFamiliesByDoctor(String doctorId) async {
     final response = await _client
         .from('family_members')

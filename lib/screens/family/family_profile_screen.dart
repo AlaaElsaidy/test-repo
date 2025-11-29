@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/router/routes.dart';
@@ -32,6 +35,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
   bool _isFetchingInvites = false;
   String? _invitesError;
   late Future<_ProfileData?> _profileFuture;
+  final ImagePicker _picker = ImagePicker();
+  bool _uploadingPhoto = false;
 
   @override
   void initState() {
@@ -70,26 +75,32 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
       final supabase = SupabaseConfig.client;
 
       final user = await userService.getUser(userId);
-      final linkedPatients = await familyMemberService.getPatientsByFamily(userId);
+      final linkedPatients =
+          await familyMemberService.getPatientsByFamily(userId);
 
       String? doctorName;
       String? doctorPhone;
       String? doctorEmail;
+      String? familyImageUrl;
+
       final familyMember = await supabase
           .from('family_members')
-          .select('doctor_id')
+          .select('doctor_id, image_url')
           .eq('id', userId)
           .maybeSingle();
-      if (familyMember != null && familyMember['doctor_id'] != null) {
-        final doctor = await supabase
-            .from('users')
-            .select('name, phone, email')
-            .eq('id', familyMember['doctor_id'])
-            .maybeSingle();
-        if (doctor != null) {
-          doctorName = doctor['name'] as String?;
-          doctorPhone = doctor['phone'] as String?;
-          doctorEmail = doctor['email'] as String?;
+      if (familyMember != null) {
+        familyImageUrl = familyMember['image_url'] as String?;
+        if (familyMember['doctor_id'] != null) {
+          final doctor = await supabase
+              .from('users')
+              .select('name, phone, email')
+              .eq('id', familyMember['doctor_id'])
+              .maybeSingle();
+          if (doctor != null) {
+            doctorName = doctor['name'] as String?;
+            doctorPhone = doctor['phone'] as String?;
+            doctorEmail = doctor['email'] as String?;
+          }
         }
       }
 
@@ -100,6 +111,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
         doctorName: doctorName,
         doctorPhone: doctorPhone,
         doctorEmail: doctorEmail,
+        familyImageUrl: familyImageUrl,
       );
     } catch (e) {
       debugPrint('Failed to load profile data: $e');
@@ -575,6 +587,36 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
     );
   }
 
+  Future<void> _changeAvatar(_ProfileData profile) async {
+    try {
+      final familyId = profile.userId;
+      final XFile? picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1024,
+      );
+      if (picked == null) return;
+
+      setState(() => _uploadingPhoto = true);
+
+      final file = File(picked.path);
+      final familyService = FamilyMemberService();
+      final url = await familyService.uploadFamilyPhoto(familyId, file);
+      await familyService.updateFamily(familyId, {'image_url': url});
+
+      if (!mounted) return;
+      setState(() {
+        _uploadingPhoto = false;
+        _profileFuture = _loadProfileData();
+      });
+      _showSnack('Profile photo updated');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _uploadingPhoto = false);
+      _showSnack('Failed to update photo: $e');
+    }
+  }
+
   Future<void> _handleLogout() async {
     try {
       await AuthService().signOut();
@@ -815,7 +857,9 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                         userName: profile.userName,
                         caregiverRole: profile.user?['role'] ?? 'Caregiver',
                         caringFor: profile.caringForName,
-                        onEdit: () => _openEditContactSheet(profile),
+                        avatarUrl: profile.familyImageUrl,
+                        uploading: _uploadingPhoto,
+                        onAvatarTap: () => _changeAvatar(profile),
                       ),
                       const SizedBox(height: 16),
                       _PatientCard(patients: profile.patients),
@@ -826,7 +870,6 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                         onEdit: () => _openEditContactSheet(profile),
                       ),
                       const SizedBox(height: 16),
-                      _LinkedPatientsCard(patients: profile.patients),
                       const SizedBox(height: 16),
                       _buildInvitationsCard(),
                       const SizedBox(height: 16),
@@ -923,17 +966,26 @@ class _ProfileHeader extends StatelessWidget {
   final String userName;
   final String caregiverRole;
   final String? caringFor;
-  final VoidCallback onEdit;
+  final String? avatarUrl;
+  final bool uploading;
+  final VoidCallback onAvatarTap;
 
   const _ProfileHeader({
     required this.userName,
     required this.caregiverRole,
     required this.caringFor,
-    required this.onEdit,
+    required this.onAvatarTap,
+    this.avatarUrl,
+    this.uploading = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    ImageProvider? avatarImage;
+    if (avatarUrl != null && avatarUrl!.isNotEmpty) {
+      avatarImage = NetworkImage(avatarUrl!);
+    }
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -942,37 +994,46 @@ class _ProfileHeader extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Stack(
-            children: [
-              const CircleAvatar(
-                radius: 48,
-                backgroundColor: Colors.white,
-                child: Icon(
-                  Icons.person,
-                  size: 48,
-                  color: AppTheme.teal500,
+          GestureDetector(
+            onTap: onAvatarTap,
+            child: Stack(
+              children: [
+                CircleAvatar(
+                  radius: 48,
+                  backgroundColor: Colors.white,
+                  backgroundImage: avatarImage,
+                  child: avatarImage == null
+                      ? const Icon(
+                          Icons.person,
+                          size: 48,
+                          color: AppTheme.teal500,
+                        )
+                      : null,
                 ),
-              ),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: GestureDetector(
-                  onTap: onEdit,
+                Positioned(
+                  right: 0,
+                  bottom: 0,
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.edit,
-                      size: 16,
-                      color: AppTheme.teal600,
-                    ),
+                    child: uploading
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(
+                            Icons.photo_camera,
+                            size: 16,
+                            color: AppTheme.teal600,
+                          ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           Text(
@@ -1032,23 +1093,13 @@ class _PatientCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Primary Patient',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.teal900,
-                  ),
-                ),
-                if (firstPatient != null)
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text('View Profile'),
-                  ),
-              ],
+            const Text(
+              'Primary Patient',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.teal900,
+              ),
             ),
             const SizedBox(height: 16),
             if (firstPatient == null)
@@ -1085,24 +1136,6 @@ class _PatientCard extends StatelessWidget {
                             color: AppTheme.teal900,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Age: ${firstPatient['age'] ?? 'N/A'} • ${firstPatient['gender'] ?? ''}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppTheme.gray600,
-                          ),
-                        ),
-                        if (firstPatient['alzheimer_stage'] != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            firstPatient['alzheimer_stage'],
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.teal600,
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -1135,14 +1168,17 @@ class _ContactInfoCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'My Contact Information',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.teal900,
+                const Expanded(
+                  child: Text(
+                    'My Contact Information',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.teal900,
+                    ),
                   ),
                 ),
                 TextButton(
@@ -1165,58 +1201,6 @@ class _ContactInfoCard extends StatelessWidget {
               value: email,
               color: AppTheme.cyan500,
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LinkedPatientsCard extends StatelessWidget {
-  final List<Map<String, dynamic>> patients;
-
-  const _LinkedPatientsCard({required this.patients});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'All Linked Patients',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.teal900,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (patients.isEmpty)
-              const Text(
-                'You have not linked any patients yet.',
-                style: TextStyle(color: AppTheme.gray600),
-              )
-            else
-              Column(
-                children: patients.map((p) {
-                  final patient = p['patients'] as Map<String, dynamic>?;
-                  if (patient == null) return const SizedBox();
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      backgroundColor: AppTheme.teal50,
-                      child: const Icon(Icons.person, color: AppTheme.teal600),
-                    ),
-                    title: Text(patient['name'] ?? 'Patient'),
-                    subtitle: Text(
-                      'Age: ${patient['age'] ?? 'N/A'} • ${patient['gender'] ?? ''}',
-                    ),
-                  );
-                }).toList(),
-              ),
           ],
         ),
       ),
@@ -1372,6 +1356,7 @@ class _ProfileData {
   final String? doctorName;
   final String? doctorPhone;
   final String? doctorEmail;
+  final String? familyImageUrl;
 
   const _ProfileData({
     required this.userId,
@@ -1380,6 +1365,7 @@ class _ProfileData {
     this.doctorName,
     this.doctorPhone,
     this.doctorEmail,
+    this.familyImageUrl,
   });
 
   String get userName => user?['name'] as String? ?? 'Caregiver';
