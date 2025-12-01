@@ -77,8 +77,14 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
       }
 
       final patients = await _patientFamilyService.getPatientsByFamily(familyUid);
+      // فى التطبيق كل فاميلى مرتبط بمريض واحد فقط، لذلك حتى لو
+      // رجعت ليست أكبر من عنصر واحد (بسبب داتا قديمة)، نستخدم
+      // أول مريض فقط ونخفى الباقى عن واجهة الفاملى.
+      final normalizedPatients =
+          patients.isNotEmpty ? <Map<String, dynamic>>[patients.first] : <Map<String, dynamic>>[];
+
       setState(() {
-        _patients = patients;
+        _patients = normalizedPatients;
       });
 
       // Select first patient if available
@@ -713,45 +719,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Patient selector (if multiple patients)
-                if (_patients.length > 1) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: DropdownButton<String>(
-                      value: _selectedPatientRecordId,
-                      isExpanded: true,
-                      dropdownColor: AppTheme.teal600,
-                      style: const TextStyle(color: Colors.white),
-                      underline: const SizedBox(),
-                      items: _patients.map((p) {
-                        final patient = p['patients'] as Map<String, dynamic>?;
-                        final recordId = patient?['id'] as String?;
-                        final name = patient?['name'] as String? ?? 'Patient';
-                        return DropdownMenuItem<String>(
-                          value: recordId,
-                          child: Text(name),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value == null) return;
-                        final patient = _patients.firstWhere(
-                          (p) => (p['patients'] as Map<String, dynamic>?)?['id'] == value,
-                        );
-                        final patientData = patient['patients'] as Map<String, dynamic>?;
-                        _selectPatient(
-                          patientData?['user_id'] as String? ?? value,
-                          value,
-                          patientData?['name'] as String? ?? 'Patient',
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                // مفيش اختيار بين أكتر من مريض؛ الفاميلى مرتبط بمريض واحد فقط.
                 const SizedBox(height: 16),
 
                 // Tabs

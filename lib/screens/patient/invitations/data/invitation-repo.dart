@@ -234,7 +234,7 @@ class InvitationRepo {
   /// Supports both Patient-to-Family and Family-to-Patient invitations
   Future<Either<String, void>> acceptInvitation({
     required String invitationCode,
-    required String patientId, // This is user_id, need to convert to patient record ID
+    required String patientId, // user_id (من جدول users) للمريض الحالى
   }) async {
     try {
       // Get invitation
@@ -253,18 +253,39 @@ class InvitationRepo {
         return const Left('Invitation has expired');
       }
 
-      // Convert user_id to patient record ID
-      // patientId parameter is user_id, but linkPatientToFamily needs patient record ID
-      final patientRecord = await _patientService.getPatientByUserId(patientId);
       String? finalPatientId;
-      
-      if (patientRecord != null && patientRecord['id'] != null) {
-        finalPatientId = patientRecord['id'] as String;
-      } else {
-        // If patient record doesn't exist, try using user_id directly
-        // This handles cases where patient_id in relations table refers to user_id
-        finalPatientId = patientId;
+
+      // 1) تأكد إن عندنا صف فعلى فى جدول patients (patients.id) للمريض ده
+      //    وما نستخدمش user_id مباشرة فى patient_family_relations عشان ما نكسرش الـ FK.
+      var patientRecord = await _patientService.getPatientByUserId(patientId);
+
+      if (patientRecord == null || patientRecord['id'] == null) {
+        // لو مفيش صف فى patients، ننشئ واحد بسيط من بيانات جدول users
+        final user = await _userService.getUser(patientId);
+        if (user == null) {
+          return const Left('Patient account not found. Please log in again.');
+        }
+
+        final String name = (user['name'] as String?)?.trim().isNotEmpty == true
+            ? (user['name'] as String).trim()
+            : 'Patient';
+
+        // addPatient هتنشئ أو تحدث سجل المريض بناءً على user_id
+        await _patientService.addPatient(
+          patientId: patientId,
+          age: 0,
+          name: name,
+          gender: 'Male', // قيمة افتراضية؛ المريض يقدر يعدلها لاحقاً من البروفايل
+        );
+
+        patientRecord = await _patientService.getPatientByUserId(patientId);
+        if (patientRecord == null || patientRecord['id'] == null) {
+          return const Left(
+              'Failed to create patient profile. Please try again later.');
+        }
       }
+
+      finalPatientId = patientRecord['id'] as String;
 
       // Determine invitation type
       final isFamilyToPatient = invitation.isFamilyToPatient;

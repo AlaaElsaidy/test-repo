@@ -159,6 +159,11 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
       try {
         patients = await _patientFamilyService
             .getPatientsByFamily(_familyMemberId!);
+        // Family member مرتبط بمريض واحد فقط؛ نستخدم أول مريض فقط
+        // حتى لو رجعت ليست أكبر من واحد بسبب داتا قديمة.
+        if (patients.isNotEmpty) {
+          patients = [patients.first];
+        }
       } catch (e) {
         debugPrint('Error loading patients: $e');
       }
@@ -186,6 +191,10 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
       try {
         patients = await _patientFamilyService
             .getPatientsByFamily(_familyMemberId!);
+        // نضمن أن الفاميلى يختار مريض واحد فقط
+        if (patients.isNotEmpty) {
+          patients = [patients.first];
+        }
       } catch (e) {
         debugPrint('Error loading patients: $e');
       }
