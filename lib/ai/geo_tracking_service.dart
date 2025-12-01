@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import '../core/supabase/safe-zone-service.dart';
 import '../core/supabase/notification-service.dart';
 import '../core/supabase/supabase-service.dart';
+import '../core/supabase/patient-family-service.dart';
 import '../core/shared-prefrences/shared-prefrences-helper.dart';
 import 'text_to_speech_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -14,6 +15,7 @@ class GeoTrackingService {
   final TextToSpeechService _ttsService = TextToSpeechService();
   final NotificationService _notificationService = NotificationService();
   final PatientService _patientService = PatientService();
+  final PatientFamilyService _patientFamilyService = PatientFamilyService();
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
@@ -22,6 +24,8 @@ class GeoTrackingService {
   bool _isMonitoring = false;
   String? _lastZoneId; // Track which zone patient was in
   String? _patientId; // Patient record ID for notifications
+  String? _patientName;
+  String? _primaryFamilyName;
 
   /// Start monitoring patient location
   Future<void> startMonitoring() async {
@@ -100,10 +104,25 @@ class GeoTrackingService {
         return;
       }
 
-      // Get patient record ID for notifications
+      // Get patient record ID and name for notifications
       final patient = await _patientService.getPatientByUserId(userId);
       if (patient != null && patient['id'] != null) {
         _patientId = patient['id'] as String;
+        _patientName = (patient['name'] as String?)?.trim();
+
+        // حاول تجيب أول قريب مرتبط بالمريض لنداء اسمه فى التنبيه
+        try {
+          final relations =
+              await _patientFamilyService.getFamilyMembersByPatient(_patientId!);
+          if (relations.isNotEmpty) {
+            final first = relations.first;
+            final family =
+                first['family_members'] as Map<String, dynamic>?;
+            _primaryFamilyName = (family?['name'] as String?)?.trim();
+          }
+        } catch (e) {
+          debugPrint('Error loading primary family member: $e');
+        }
       }
 
       final zones = await _safeZoneService.getSafeZonesByPatient(userId);
@@ -155,7 +174,16 @@ class GeoTrackingService {
   Future<void> _handleZoneExit(Position position) async {
     debugPrint('Patient left safe zone at ${position.latitude}, ${position.longitude}');
 
-    const patientMessage = 'انت خرجت من المنطقه الامنه بس متقلقش هنبلع قرايبك';
+    final name = (_patientName ?? '').trim();
+    final familyName = (_primaryFamilyName ?? '').trim();
+
+    final displayPatient =
+        name.isNotEmpty ? name : 'حبيبتى';
+    final displayFamily =
+        familyName.isNotEmpty ? familyName : 'قرايبك';
+
+    final patientMessage =
+        'يا $displayPatient، انتِ خرجتِ من المنطقة الآمنة بس متقلقيش، هتواصل مع $displayFamily.';
 
     // Send local notification to patient
     await _showAlertNotification(patientMessage);
@@ -174,11 +202,13 @@ class GeoTrackingService {
           patientId: _patientId!,
           type: NotificationType.zoneExit,
           title: 'تنبيه: خروج من المنطقة الآمنة',
-          message: 'المريض خرج من المنطقة الآمنة',
+          message: '$displayPatient خرجت من المنطقة الآمنة، برجاء التواصل معها فوراً.',
           data: {
             'latitude': position.latitude,
             'longitude': position.longitude,
             'timestamp': DateTime.now().toIso8601String(),
+            'patient_name': name,
+            'family_name': familyName,
           },
         );
         debugPrint('Notification sent to family members');

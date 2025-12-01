@@ -321,15 +321,20 @@ class _PatientDashboardState extends State<PatientDashboard> {
     final ImageProvider? avatarImage;
     if (_avatarFile != null) {
       avatarImage = FileImage(_avatarFile!);
-    } else if (_patientPhotoUrl != null && _patientPhotoUrl!.isNotEmpty) {
-      if (_patientPhotoUrl!.startsWith('http')) {
-        avatarImage = NetworkImage(_patientPhotoUrl!);
-      } else {
-        final file = File(_patientPhotoUrl!);
-        avatarImage = file.existsSync() ? FileImage(file) : null;
-      }
     } else {
-      avatarImage = null;
+      // لو الصورة متحدثة فى البروفايل، نحاول نقرأها من Supabase أو من SharedPrefs
+      final storedPhotoUrl =
+          _patientPhotoUrl ?? SharedPrefsHelper.getString('patientPhotoUrl');
+      if (storedPhotoUrl != null && storedPhotoUrl.isNotEmpty) {
+        if (storedPhotoUrl.startsWith('http')) {
+          avatarImage = NetworkImage(storedPhotoUrl);
+        } else {
+          final file = File(storedPhotoUrl);
+          avatarImage = file.existsSync() ? FileImage(file) : null;
+        }
+      } else {
+        avatarImage = null;
+      }
     }
 
     final cardsCount = _cards.length;

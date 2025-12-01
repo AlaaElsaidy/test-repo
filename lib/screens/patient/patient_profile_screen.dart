@@ -65,6 +65,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _addressCtrl;
+  late final TextEditingController _emergencyPhoneCtrl;
 
   FamilyContact? _familyContact;
 
@@ -87,6 +88,9 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     _phoneCtrl = TextEditingController(text: _patient.phone);
     _emailCtrl = TextEditingController(text: _patient.email);
     _addressCtrl = TextEditingController(text: _patient.address);
+    _emergencyPhoneCtrl = TextEditingController(
+      text: _patient.emergencyContact?.phone ?? '',
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadProfileData();
@@ -99,6 +103,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
     _addressCtrl.dispose();
+    _emergencyPhoneCtrl.dispose();
     super.dispose();
   }
 
@@ -109,6 +114,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     _phoneCtrl.text = _patient.phone;
     _emailCtrl.text = _patient.email;
     _addressCtrl.text = _patient.address;
+    _emergencyPhoneCtrl.text =
+        _patient.emergencyContact?.phone ?? _familyContact?.phone ?? '';
   }
 
   Future<void> _loadProfileData() async {
@@ -214,6 +221,9 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         _phoneCtrl.text = updatedPatient.phone;
         _emailCtrl.text = updatedPatient.email;
         _addressCtrl.text = updatedPatient.address;
+        _emergencyPhoneCtrl.text = familyContact?.phone.isNotEmpty == true
+            ? familyContact!.phone
+            : (updatedPatient.emergencyContact?.phone ?? '');
         _loading = false;
       });
     } catch (e) {
@@ -264,6 +274,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         await _patientService
             .updatePatient(_patientRowId!, {'photo_url': url});
       }
+      // خزن رابط الصورة محلياً عشان الصفحات التانية (زي لعبة الذاكرة) تقدر تستخدمه فوراً
+      await SharedPrefsHelper.saveString('patientPhotoUrl', url);
       setState(() {
         _patient = _patient.copyWith(avatarPath: url);
       });
@@ -390,13 +402,19 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       return;
     }
 
-    setState(() => _saving = true);
-
     final name = _nameCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
     final email = _emailCtrl.text.trim();
     final address = _addressCtrl.text.trim();
+    final emergencyPhone = _emergencyPhoneCtrl.text.trim();
+    setState(() => _saving = true);
     try {
+      // خزن رقم الطوارئ محلياً عشان صفحة التتبع تقدر تستخدمه فوراً
+      if (emergencyPhone.isNotEmpty) {
+        await SharedPrefsHelper.saveString(
+            'patientEmergencyPhone', emergencyPhone);
+      }
+
       final futures = <Future<void>>[
         _userService.updateUser(_patientUserId!, {
           'name': name,
@@ -406,14 +424,11 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       ];
 
       if (_patientRowId != null) {
-        final contactPhone = _familyContact?.phone;
         futures.add(_patientService.updatePatient(_patientRowId!, {
           'name': name,
           'home_address': address,
           'phone_emergency':
-              (contactPhone != null && contactPhone.isNotEmpty)
-                  ? contactPhone
-                  : null,
+              emergencyPhone.isNotEmpty ? emergencyPhone : null,
         }));
       }
 
@@ -424,11 +439,13 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         phone: phone,
         email: email,
         address: address,
-        emergencyContact: _familyContact != null
+        emergencyContact: emergencyPhone.isNotEmpty
             ? EmergencyContact(
-                name: _familyContact!.name,
-                relation: _familyContact!.relation,
-                phone: _familyContact!.phone,
+                name: _familyContact?.name ?? _patient.emergencyContact?.name ?? '',
+                relation: _familyContact?.relation ??
+                    _patient.emergencyContact?.relation ??
+                    '',
+                phone: emergencyPhone,
               )
             : null,
       );
@@ -746,6 +763,15 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 10),
+                      if (_editing) ...[
+                        _buildTextField(
+                          controller: _emergencyPhoneCtrl,
+                          label: tr('Emergency phone number', 'رقم هاتف جهة الطوارئ'),
+                          icon: Icons.phone_in_talk,
+                          keyboardType: TextInputType.phone,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       if (_familyContact != null)
                         Row(
                           children: [
@@ -785,10 +811,14 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                                         fontSize: 13, color: Colors.orange),
                                   ),
                                   Text(
-                                    _familyContact!.phone.isNotEmpty
-                                        ? _familyContact!.phone
-                                        : tr('No phone available',
-                                            'لا يوجد رقم هاتف'),
+                                    _emergencyPhoneCtrl.text.isNotEmpty
+                                        ? _emergencyPhoneCtrl.text
+                                        : (_familyContact!.phone.isNotEmpty
+                                            ? _familyContact!.phone
+                                            : tr(
+                                                'No phone available',
+                                                'لا يوجد رقم هاتف',
+                                              )),
                                     style: const TextStyle(
                                         fontSize: 13, color: Colors.orange),
                                   ),

@@ -72,29 +72,41 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       patientId = patient['id'] as String?;
       setState(() => _patientId = patientId);
       
-      // Try to get phone from family members first
-      String? familyPhone;
-      if (patientId != null) {
-        try {
-          final relations = await _patientFamilyService.getFamilyMembersByPatient(patientId);
-          if (relations.isNotEmpty) {
-            final firstRelation = relations.first;
-            final familyMember = firstRelation['family_members'] as Map<String, dynamic>?;
-            familyPhone = familyMember?['phone'] as String?;
-            if (familyPhone != null && familyPhone.trim().isNotEmpty) {
-              setState(() => _emergencyPhone = familyPhone);
+      // أولاً: استخدم رقم الطوارئ المحفوظ فى ملف المريض (من شاشة البروفايل)
+      final emergencyFromPatient =
+          (patient['phone_emergency'] as String?)?.trim();
+      if (emergencyFromPatient != null && emergencyFromPatient.isNotEmpty) {
+        setState(() => _emergencyPhone = emergencyFromPatient);
+      }
+      
+      // ثانياً: لو مفيش رقم طوارئ، جرّب تجيب رقم من القريب المرتبط
+      if (_emergencyPhone == null || _emergencyPhone!.isEmpty) {
+        String? familyPhone;
+        if (patientId != null) {
+          try {
+            final relations =
+                await _patientFamilyService.getFamilyMembersByPatient(patientId);
+            if (relations.isNotEmpty) {
+              final firstRelation = relations.first;
+              final familyMember =
+                  firstRelation['family_members'] as Map<String, dynamic>?;
+              familyPhone = familyMember?['phone'] as String?;
+              if (familyPhone != null && familyPhone.trim().isNotEmpty) {
+                setState(() => _emergencyPhone = familyPhone);
+              }
             }
+          } catch (e) {
+            debugPrint('Failed to load family members: $e');
           }
-        } catch (e) {
-          debugPrint('Failed to load family members: $e');
         }
       }
       
-      // Fallback to phone_emergency if no family phone found
+      // آخر حاجة: لو لسه مفيش، حاول تقرأ من SharedPrefs (آخر رقم طوارئ محفوظ من البروفايل)
       if (_emergencyPhone == null || _emergencyPhone!.isEmpty) {
-        final emergencyPhone = patient['phone_emergency'] as String?;
-        if (emergencyPhone != null && emergencyPhone.trim().isNotEmpty) {
-          setState(() => _emergencyPhone = emergencyPhone);
+        final localEmergency =
+            SharedPrefsHelper.getString('patientEmergencyPhone');
+        if (localEmergency != null && localEmergency.trim().isNotEmpty) {
+          setState(() => _emergencyPhone = localEmergency.trim());
         }
       }
     }
