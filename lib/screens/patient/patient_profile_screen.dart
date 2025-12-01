@@ -146,10 +146,21 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       FamilyContact? familyContact;
       if (patientRowId != null) {
         try {
-          final relations =
+          // Primary lookup: use patients.id (record ID)
+          List<Map<String, dynamic>> relations =
               await _patientFamilyService.getFamilyMembersByPatient(
             patientRowId,
           );
+
+          // Fallback: some older relations may have been stored using the
+          // patient user_id instead of patients.id. If nothing is found
+          // with the record ID, try again with the auth/user ID.
+          if (relations.isEmpty) {
+            relations = await _patientFamilyService.getFamilyMembersByPatient(
+              patientUid,
+            );
+          }
+
           if (relations.isNotEmpty) {
             final first = relations.first;
             final relative = first['family_members'] as Map<String, dynamic>?;
@@ -791,10 +802,14 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
+                                    // الاسم الأساسى للفاميلى المرتبط بالمريض
+                                    // لو الاسم فاضى (حالات قديمة)، نعرض تسمية عامة.
                                     _familyContact!.name.isNotEmpty
                                         ? _familyContact!.name
-                                        : tr('Linked family member',
-                                            'القريب المرتبط'),
+                                        : tr(
+                                            'Linked family member',
+                                            'القريب المرتبط',
+                                          ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -804,11 +819,17 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                                     ),
                                   ),
                                   Text(
+                                    // السطر التانى يفضل يعرض نوع العلاقة (أم، بنت، أخ…)
+                                    // ولو مفيش علاقة محفوظة، نكرر الاسم بدل كلمة "Family member".
                                     _familyContact!.relation.isNotEmpty
                                         ? _familyContact!.relation
-                                        : tr('Family member', 'قريب'),
+                                        : (_familyContact!.name.isNotEmpty
+                                            ? _familyContact!.name
+                                            : tr('Family member', 'قريب')),
                                     style: const TextStyle(
-                                        fontSize: 13, color: Colors.orange),
+                                      fontSize: 13,
+                                      color: Colors.orange,
+                                    ),
                                   ),
                                   Text(
                                     _emergencyPhoneCtrl.text.isNotEmpty

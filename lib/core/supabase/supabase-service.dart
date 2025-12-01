@@ -181,4 +181,32 @@ class DoctorService {
 
     return response;
   }
+
+  /// Get a single doctor profile joined with user data
+  Future<Map<String, dynamic>?> getDoctorProfile(String doctorUserId) async {
+    final response = await _client
+        .from('doctors')
+        .select('''
+          id,
+          user_id,
+          specialty,
+          years_experience,
+          hospital,
+          photo_url,
+          users (
+            name,
+            email,
+            phone
+          )
+        ''')
+        .eq('user_id', doctorUserId)
+        .maybeSingle();
+
+    return response;
+  }
+
+  /// Update doctor-specific fields
+  Future<void> updateDoctor(String doctorId, Map<String, dynamic> data) async {
+    await _client.from('doctors').update(data).eq('id', doctorId);
+  }
 }

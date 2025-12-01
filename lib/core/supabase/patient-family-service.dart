@@ -12,7 +12,9 @@ class PatientFamilyService {
   }) async {
     final now = DateTime.now();
 
-    // If relation already exists, just return it
+    // If relation already exists for this patient-family pair,
+    // keep it and make sure there are no other patients linked
+    // to the same family member.
     final alreadyExists = await relationExists(
       patientId: patientId,
       familyMemberId: familyMemberId,
@@ -26,6 +28,20 @@ class PatientFamilyService {
           .eq('family_member_id', familyMemberId)
           .single();
 
+      // Business rule: one active patient per family member.
+      // Remove any other relations this family member might have
+      // with different patients, and keep only this one.
+      try {
+        await _client
+            .from('patient_family_relations')
+            .delete()
+            .eq('family_member_id', familyMemberId)
+            .neq('patient_id', patientId);
+      } catch (_) {
+        // If deletion fails due to RLS or constraints, we still
+        // return the existing relation.
+      }
+
       // Try to back-fill family_members.patient_id
       try {
         await _client
@@ -37,6 +53,18 @@ class PatientFamilyService {
       }
 
       return PatientFamilyRelationModel.fromJson(existing);
+    }
+
+    // No relation currently exists between this family member and this patient.
+    // To enforce "one patient per family", remove any old relations for
+    // this family member before creating the new one.
+    try {
+      await _client
+          .from('patient_family_relations')
+          .delete()
+          .eq('family_member_id', familyMemberId);
+    } catch (_) {
+      // Ignore errors – we'll still try to insert the new relation.
     }
 
     // Insert new relation

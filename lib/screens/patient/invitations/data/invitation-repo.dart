@@ -163,11 +163,9 @@ class InvitationRepo {
         }
       }
 
-      // Link patient to family immediately
-      // Note: patientId used here is the patient record id when available.
-      String? linkingError;
-      
-      // Try with patient record ID first (most likely correct)
+      // Link patient to family immediately using the *patient record id only*.
+      // This guarantees that patient_family_relations.patient_id always points
+      // to patients.id (وليس users.id) حتى لا يحدث لخبطة فى الداتابيز.
       try {
         final relationExists = await _patientFamilyService.relationExists(
           patientId: patientRecordId,
@@ -180,37 +178,12 @@ class InvitationRepo {
             familyMemberId: familyMemberId,
           );
         }
-        linkingError = null; // Success
       } catch (e) {
-        linkingError = SupabaseErrorHandler.handleError(e);
-        // If linking with patient record ID fails, try with user ID
-        // This handles cases where patient_id refers to user_id instead of patients.id
-        try {
-          final relationExists = await _patientFamilyService.relationExists(
-            patientId: patientUserId,
-            familyMemberId: familyMemberId,
-          );
-
-          if (!relationExists) {
-            await _patientFamilyService.linkPatientToFamily(
-              patientId: patientUserId,
-              familyMemberId: familyMemberId,
-            );
-          }
-          linkingError = null; // Success with user ID
-        } catch (e2) {
-          // If both fail, log the error but don't fail the invitation creation
-          // The invitation is already created, linking can be done later
-          linkingError = 'Warning: Failed to link patient to family automatically. ${SupabaseErrorHandler.handleError(e2)}';
-          // Don't return error here - invitation is created successfully
-          // The relation can be established when patient accepts the invitation
-        }
-      }
-      
-      // If linking failed, log it but don't fail the invitation
-      if (linkingError != null) {
-        print('Warning: $linkingError');
-        // Invitation is still created successfully
+        // لو الربط فشل لأى سبب، نسجل تحذير لكن مانفشلش عملية الإنفتيشن.
+        final msg = SupabaseErrorHandler.handleError(e);
+        // ignore: avoid_print
+        print(
+            'Warning: Failed to link patient to family automatically (record id). $msg');
       }
 
       return Right(invitation);
@@ -254,16 +227,25 @@ class InvitationRepo {
       }
 
       // Convert user_id to patient record ID
-      // patientId parameter is user_id, but linkPatientToFamily needs patient record ID
-      final patientRecord = await _patientService.getPatientByUserId(patientId);
+      // patientId parameter هو user_id، لكن فى جدول العلاقات نريد دائمًا patients.id
+      Map<String, dynamic>? patientRecord =
+          await _patientService.getPatientByUserId(patientId);
       String? finalPatientId;
-      
-      if (patientRecord != null && patientRecord['id'] != null) {
-        finalPatientId = patientRecord['id'] as String;
-      } else {
-        // If patient record doesn't exist, try using user_id directly
-        // This handles cases where patient_id in relations table refers to user_id
-        finalPatientId = patientId;
+
+      if (patientRecord == null || patientRecord['id'] == null) {
+        // لو مفيش record فى جدول patients، ننشئ واحد بسيط ونرجع الـ id.
+        await _patientService.addPatient(
+          patientId: patientId,
+          age: 0,
+          name: 'Patient',
+          gender: 'Male',
+        );
+        patientRecord = await _patientService.getPatientByUserId(patientId);
+      }
+
+      finalPatientId = patientRecord?['id'] as String?;
+      if (finalPatientId == null) {
+        return const Left('Failed to resolve patient record ID');
       }
 
       // Determine invitation type

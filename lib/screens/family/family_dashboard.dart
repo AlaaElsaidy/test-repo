@@ -288,7 +288,8 @@ class FamilyDashboard extends StatelessWidget {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
                           return const Center(
-                              child: CircularProgressIndicator());
+                            child: CircularProgressIndicator(),
+                          );
                         }
 
                         if (snapshot.hasError) {
@@ -310,49 +311,51 @@ class FamilyDashboard extends StatelessWidget {
                           );
                         }
 
-                        return Column(
-                          children: patients.map((patientData) {
-                            final patient = patientData['patients']
-                                as Map<String, dynamic>?;
-                            if (patient == null) return const SizedBox();
+                        // Business rule: a family member is linked to
+                        // exactly one active patient. Even if the API
+                        // returns multiple rows (قديماً)، نظهر أول مريض فقط.
+                        final firstRelation = patients.first;
+                        final patient = firstRelation['patients']
+                            as Map<String, dynamic>?;
+                        if (patient == null) {
+                          return const SizedBox.shrink();
+                        }
 
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: CircleAvatar(
-                                backgroundColor: AppTheme.teal100,
-                                child: patient['photo_url'] != null
-                                    ? ClipOval(
-                                        child: Image.network(
-                                          patient['photo_url'],
-                                          width: 40,
-                                          height: 40,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      )
-                                    : Icon(Icons.person,
-                                        color: AppTheme.teal600),
-                              ),
-                              title: Text(
-                                patient['name'] ?? 'Unknown',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              subtitle: Text(
-                                'Age: ${patient['age'] ?? 'N/A'} | ${patient['gender'] ?? ''}',
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              trailing: patientData['relation_type'] != null
-                                  ? Chip(
-                                      label: Text(
-                                        patientData['relation_type'],
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                      backgroundColor: AppTheme.teal50,
-                                    )
-                                  : null,
-                            );
-                          }).toList(),
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: AppTheme.teal100,
+                            child: patient['photo_url'] != null
+                                ? ClipOval(
+                                    child: Image.network(
+                                      patient['photo_url'],
+                                      width: 40,
+                                      height: 40,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.person,
+                                    color: AppTheme.teal600,
+                                  ),
+                          ),
+                          title: Text(
+                            patient['name'] ?? 'Unknown',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          // نعرض اسم المريض فقط بدون العمر والجندر
+                          subtitle: const SizedBox.shrink(),
+                          trailing: firstRelation['relation_type'] != null
+                              ? Chip(
+                                  label: Text(
+                                    firstRelation['relation_type'],
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  backgroundColor: AppTheme.teal50,
+                                )
+                              : null,
                         );
                       },
                     ),
