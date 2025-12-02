@@ -129,10 +129,21 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   }
 
   Future<void> _loadSafeZones() async {
-    if (_patientId == null) return;
+    // نقدر نستخدم patient_id من جدول patients مباشرة لأن جدول safe_zones
+    // مخزّن فيه patient_id كـ record id، ونفس الـ ID هو اللى بتستخدمه شاشة الفاميلى.
+    // لو لسبب ما _patientId مش متوفر، نرجع نستخدم user_id لتحويله جوّه السيرفس.
+    if (_patientId == null && _userId == null) return;
 
     try {
-      final zones = await _safeZoneService.getSafeZonesByPatient(_patientId!);
+      final List<SafeZone> zones;
+      if (_patientId != null) {
+        // استخدم record id (patients.id) لو متوفر
+        zones =
+            await _safeZoneService.getSafeZonesByPatientRecordId(_patientId!);
+      } else {
+        // Fallback: استخدم user_id لتحويله إلى patient_record_id داخل السيرفس
+        zones = await _safeZoneService.getSafeZonesByPatient(_userId!);
+      }
       setState(() {
         _safeZones = zones;
       });
