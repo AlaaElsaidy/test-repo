@@ -33,11 +33,14 @@ class _SignInScreenState extends State<SignInScreen> {
 
   bool _rememberMe = false;
   String? _selectedRole;
+  bool _patientOnboarded = false;
 
   @override
   void initState() {
     super.initState();
     _selectedRole = SharedPrefsHelper.getString('selectedRole');
+    _patientOnboarded =
+        SharedPrefsHelper.getBool('patientOnboarded') ?? false;
   }
 
   @override
@@ -82,17 +85,30 @@ class _SignInScreenState extends State<SignInScreen> {
               if (user.role == "patient") {
                 await SharedPrefsHelper.saveString(
                     "patientUid", state.user!['id']);
-                
-                // Check if patient profile exists in Supabase
+
+                // لو المريض لسه أول مرة يستخدم التطبيق (لسه معملش أونبوردنج)
+                final onboarded =
+                    SharedPrefsHelper.getBool('patientOnboarded') ?? false;
+                if (!onboarded) {
+                  // بعد أول لوجين يروح شاشة قبول الدعوة أولاً
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    AppRoutes.invitationAcceptance,
+                    (route) => false,
+                  );
+                  return;
+                }
+
+                // لو المريض سبق وعمل أونبوردنج، نكمل الفلو العادى
                 final patientService = PatientService();
-                final patientRecord = await patientService.getPatientByUserId(state.user!['id']);
-                
-                // Check if patient has complete profile (has name, age, gender, etc.)
+                final patientRecord =
+                    await patientService.getPatientByUserId(state.user!['id']);
+
                 final hasCompleteProfile = patientRecord != null &&
                     patientRecord['name'] != null &&
                     patientRecord['age'] != null &&
                     patientRecord['gender'] != null;
-                
+
                 Navigator.pushNamedAndRemoveUntil(
                   context,
                   hasCompleteProfile
@@ -342,7 +358,8 @@ class _SignInScreenState extends State<SignInScreen> {
                             SizedBox(height: context.h(16)),
                             buildSignUpLink(context),
                             SizedBox(height: context.h(8)),
-                            if (_selectedRole == 'patient') ...[
+                            if (_selectedRole == 'patient' &&
+                                !_patientOnboarded) ...[
                               TextButton.icon(
                                 onPressed: () {
                                   Navigator.pushNamed(

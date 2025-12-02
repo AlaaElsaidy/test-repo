@@ -382,7 +382,11 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       try {
         await _authService.signOut();
       } catch (_) {}
+
+      // امسح الجلسة الحالية لكن احتفظ بعَلم أن المريض عنده حساب فعلاً
       await SharedPrefsHelper.clear();
+      await SharedPrefsHelper.saveBool('patientOnboarded', true);
+
       if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(
         context,

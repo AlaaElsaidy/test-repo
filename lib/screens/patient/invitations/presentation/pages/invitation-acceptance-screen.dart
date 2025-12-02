@@ -389,7 +389,7 @@ class _InvitationAcceptanceScreenState extends State<InvitationAcceptanceScreen>
           ),
         ),
         body: BlocListener<InvitationCubit, InvitationState>(
-          listener: (context, state) {
+          listener: (context, state) async {
             if (state is InvitationFailure) {
               showErrorDialog(
                 context: context,
@@ -402,18 +402,33 @@ class _InvitationAcceptanceScreenState extends State<InvitationAcceptanceScreen>
             } else if (state is InvitationAccepted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content:
-                      Text('Invitation accepted! Please sign in to continue.'),
+                  content: Text('Invitation accepted successfully ✅'),
                   backgroundColor: Colors.green,
                 ),
               );
-              SharedPrefsHelper.remove("patientUid");
-              SharedPrefsHelper.remove("userId");
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                AppRoutes.login,
-                (route) => false,
-              );
+              // اعتبر أن المريض أتم خطوة الدعوة/إنشاء الحساب مرة واحدة على الأقل
+              await SharedPrefsHelper.saveBool('patientOnboarded', true);
+
+              // لو عندنا patientUid على الجهاز ⇒ المريض بالفعل عامل لوجين
+              final hasLocalPatient = _patientUid != null;
+
+              if (hasLocalPatient) {
+                // إبقى على الجلسة الحالية وادخل مباشرة على الصفحة الرئيسية للمريض
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  AppRoutes.patientMain,
+                  (route) => false,
+                );
+              } else {
+                // فى الحالات اللى بيتعمل فيها الحساب من شاشة الدعوة قبل اللوجين
+                SharedPrefsHelper.remove("patientUid");
+                SharedPrefsHelper.remove("userId");
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  AppRoutes.login,
+                  (route) => false,
+                );
+              }
             } else if (state is InvitationRejected) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
