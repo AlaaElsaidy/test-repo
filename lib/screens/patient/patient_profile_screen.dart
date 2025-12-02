@@ -386,7 +386,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(
         context,
-        AppRoutes.login,
+        AppRoutes.roleSelection,
         (route) => false,
       );
     }

@@ -625,7 +625,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(
       context,
-      AppRoutes.login,
+      AppRoutes.roleSelection,
       (route) => false,
     );
   }

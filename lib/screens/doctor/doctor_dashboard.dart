@@ -15,8 +15,11 @@ class DoctorDashboard extends StatefulWidget {
 class _DoctorDashboardState extends State<DoctorDashboard> {
   final _client = SupabaseConfig.client;
   final FamilyMemberService _familyService = FamilyMemberService();
+  final DoctorService _doctorService = DoctorService();
+  final AppointmentService _appointmentService = AppointmentService();
   
   String? _doctorName;
+  String? _doctorPhotoUrl;
   int _activePatientsCount = 0;
   int _appointmentsCount = 0;
   List<Map<String, dynamic>> _todayAppointments = [];
@@ -58,10 +61,17 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
           .select('name')
           .eq('id', doctorId)
           .maybeSingle();
+
+      final doctorRow = await _doctorService.getDoctorById(doctorId);
+      final cachedPhoto = SharedPrefsHelper.getString('doctorPhotoUrl');
       
       if (user != null) {
         setState(() {
           _doctorName = user['name'] as String? ?? 'Doctor';
+          _doctorPhotoUrl =
+              (doctorRow?['photo'] as String?)?.trim().isNotEmpty == true
+                  ? (doctorRow!['photo'] as String)
+                  : cachedPhoto;
         });
       }
     } catch (e) {
@@ -103,62 +113,50 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
   Future<void> _loadAppointmentsCount(String doctorId) async {
     try {
-      // Count doctor advices as appointments (or use appointments table if exists)
-      final today = DateTime.now();
-      final startOfDay = DateTime(today.year, today.month, today.day);
-      
-      final appointments = await _client
-          .from('doctor_advices')
-          .select('id')
-          .eq('doctor_id', doctorId)
-          .gte('created_at', startOfDay.toIso8601String());
-      
       setState(() {
-        _appointmentsCount = (appointments as List).length;
+        // نستخدم جدول appointments الحقيقى
+        _appointmentsCount = 0;
+      });
+
+      final count = await _appointmentService.countTodayAppointments(doctorId);
+      setState(() {
+        _appointmentsCount = count;
       });
     } catch (e) {
-      debugPrint('Failed to load appointments count: $e');
+      debugPrint('Failed to load appointments count from appointments table: $e');
     }
   }
 
   Future<void> _loadTodayAppointments(String doctorId) async {
     try {
-      final today = DateTime.now();
-      final startOfDay = DateTime(today.year, today.month, today.day);
-      final endOfDay = startOfDay.add(const Duration(days: 1));
-      
-      final appointments = await _client
-          .from('doctor_advices')
-          .select('''
-            id,
-            created_at,
-            family_member_id,
-            family_members (
-              id,
-              name
-            ),
-            patients (
-              id,
-              name
-            )
-          ''')
-          .eq('doctor_id', doctorId)
-          .gte('created_at', startOfDay.toIso8601String())
-          .lt('created_at', endOfDay.toIso8601String())
-          .order('created_at', ascending: true)
-          .limit(5);
-      
       setState(() {
-        _todayAppointments = (appointments as List).cast<Map<String, dynamic>>();
+        _todayAppointments = [];
+      });
+
+      final appointments =
+          await _appointmentService.getTodayAppointments(doctorId);
+
+      setState(() {
+        _todayAppointments = appointments;
       });
     } catch (e) {
-      debugPrint('Failed to load today appointments: $e');
+      debugPrint('Failed to load today appointments from appointments table: $e');
     }
   }
 
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isNarrow = width < 360;
+
+    ImageProvider? avatarImage;
+    if (_doctorPhotoUrl != null && _doctorPhotoUrl!.isNotEmpty) {
+      if (_doctorPhotoUrl!.startsWith('http')) {
+        avatarImage = NetworkImage(_doctorPhotoUrl!);
+      }
+    }
+
     return SafeArea(
       child: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -178,19 +176,18 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Icon(
+                    CircleAvatar(
+                      radius: 32,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      backgroundImage: avatarImage,
+                      child: avatarImage == null
+                          ? const Icon(
                               Icons.medical_services,
                               color: Colors.white,
                               size: 32,
-                            ),
-                          ),
+                            )
+                          : null,
+                    ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
@@ -215,21 +212,18 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                               ],
                             ),
                           ),
-                          IconButton(
-                            onPressed: () {},
-                            icon: const Icon(Icons.notifications_outlined),
-                            color: Colors.white,
-                            iconSize: 28,
-                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
 
                     // Quick Stats
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
                       children: [
-                        Expanded(
+                        SizedBox(
+                          width: isNarrow ? double.infinity : (width - 16 * 2 - 12) / 2,
                           child: StatCard(
                             icon: Icons.people,
                             label: 'Active Patients',
@@ -238,8 +232,8 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                             backgroundColor: AppTheme.teal50,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
+                        SizedBox(
+                          width: isNarrow ? double.infinity : (width - 16 * 2 - 12) / 2,
                           child: StatCard(
                             icon: Icons.calendar_today,
                             label: 'Appointments',
@@ -261,20 +255,24 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Today\'s Appointments',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.teal900,
-                                  ),
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Today\'s Appointments',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.teal900,
                                 ),
-                                TextButton(
-                                  onPressed: () {},
-                                  child: const Text('View All'),
-                                ),
-                              ],
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {},
+                              child: const Text('View All'),
+                            ),
+                          ],
                             ),
                             const SizedBox(height: 16),
                             if (_todayAppointments.isEmpty)
@@ -291,31 +289,28 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                               )
                             else
                               ..._todayAppointments.map((appointment) {
-                                final family = appointment['family_members'] as Map<String, dynamic>?;
-                                final patient = appointment['patients'] as Map<String, dynamic>?;
-                                final createdAt = appointment['created_at'] as String?;
-                                
-                                String patientName = 'Unknown';
-                                if (patient != null && patient['name'] != null) {
-                                  patientName = patient['name'] as String;
-                                } else if (family != null && family['name'] != null) {
-                                  patientName = '${family['name'] as String}\'s Patient';
-                                }
-                                
+                                final String patientName =
+                                    (appointment['patient_name'] as String?) ??
+                                        'Unknown';
+
+                                // time يُخزن كسلسلة "HH:MM:SS" حسب المايجريشن
                                 String time = 'Unknown';
-                                if (createdAt != null) {
+                                final rawTime = appointment['time'] as String?;
+                                if (rawTime != null && rawTime.isNotEmpty) {
                                   try {
-                                    final dateTime = DateTime.parse(createdAt);
-                                    final hour = dateTime.hour;
-                                    final minute = dateTime.minute;
+                                    final parts = rawTime.split(':');
+                                    final hour = int.parse(parts[0]);
+                                    final minute = int.parse(parts[1]);
                                     final period = hour >= 12 ? 'PM' : 'AM';
-                                    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-                                    time = '${displayHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
-                                  } catch (e) {
-                                    time = 'Unknown';
+                                    final displayHour =
+                                        hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+                                    time =
+                                        '${displayHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
+                                  } catch (_) {
+                                    time = rawTime;
                                   }
                                 }
-                                
+
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: _AppointmentItem(

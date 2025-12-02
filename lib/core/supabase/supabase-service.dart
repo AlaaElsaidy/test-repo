@@ -176,9 +176,77 @@ class FamilyMemberService {
 class DoctorService {
   final _client = SupabaseConfig.client;
 
+  Future<Map<String, dynamic>?> getDoctorById(String doctorId) async {
+    final response = await _client
+        .from('doctors')
+        .select()
+        .eq('id', doctorId)
+        .maybeSingle();
+    return response;
+  }
+
   Future<List<Map<String, dynamic>>> getDoctors() async {
     final response = await _client.from('doctors').select();
 
     return response;
+  }
+
+  /// Upload doctor profile photo and return public URL.
+  /// Uses same storage bucket as patient avatars for simplicity.
+  Future<String> uploadDoctorPhoto(String doctorId, File imageFile) async {
+    final fileName = 'doctor_$doctorId.jpg';
+    final bucket = _client.storage.from('patientImg');
+
+    try {
+      await bucket.remove([fileName]);
+    } catch (_) {}
+
+    await bucket.upload(
+      fileName,
+      imageFile,
+      fileOptions: const FileOptions(upsert: true),
+    );
+
+    final publicUrl = bucket.getPublicUrl(fileName);
+
+    // حاول نحفظ الرابط فى جدول الأطباء لو العمود موجود (photo)
+    try {
+      await _client
+          .from('doctors')
+          .update({'photo': publicUrl}).eq('id', doctorId);
+    } catch (_) {
+      // لو مفيش عمود photo نتجاهل الخطأ ونرجّع الـ URL على أى حال
+    }
+
+    return publicUrl;
+  }
+}
+
+// ============== Appointments Service ==============
+class AppointmentService {
+  final _client = SupabaseConfig.client;
+
+  /// Get today's appointments for a doctor from appointments table
+  Future<List<Map<String, dynamic>>> getTodayAppointments(String doctorId) async {
+    final today = DateTime.now();
+    final startOfDay = DateTime(today.year, today.month, today.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final response = await _client
+        .from('appointments')
+        .select()
+        .eq('doctor_id', doctorId)
+        .gte('date', startOfDay.toIso8601String().substring(0, 10))
+        .lt('date', endOfDay.toIso8601String().substring(0, 10))
+        .order('date')
+        .order('time');
+
+    return (response as List).cast<Map<String, dynamic>>();
+  }
+
+  /// Count all upcoming appointments for today
+  Future<int> countTodayAppointments(String doctorId) async {
+    final appointments = await getTodayAppointments(doctorId);
+    return appointments.length;
   }
 }
