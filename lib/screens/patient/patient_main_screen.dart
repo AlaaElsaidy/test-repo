@@ -1,20 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/shared-prefrences/shared-prefrences-helper.dart';
-import '../../services/lobna/lobna_voice_controller.dart';
-import '../../services/lobna/activity_reminder_service.dart';
-import '../../services/lobna/prompts/lobna_dialect_adapter.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/lobna_listen_button.dart';
-import '../services/chat_manager.dart';
-import 'lobna_text_chat_screen.dart';
 import 'chat_with_doctor_screen.dart';
 import 'live_tracking_screen.dart';
 import 'memory_activities_screen.dart';
 import 'patient_dashboard.dart';
-import 'patient_profile_screen.dart'; // ADDED: نحتاجه عشان نمرّر Patient
+import 'patient_profile_screen.dart' show PatientProfileScreen, Patient, EmergencyContact;
 
 class PatientMainScreen extends StatefulWidget {
   const PatientMainScreen({super.key});
@@ -26,63 +18,125 @@ class PatientMainScreen extends StatefulWidget {
 class _PatientMainScreenState extends State<PatientMainScreen> {
   int _currentIndex = 0;
 
-  // Initialize immediately - no late variables
-  final Patient _patient = const Patient(
-    name: 'Margaret Smith',
-    age: 72,
-    phone: '+1 (555) 123-4567',
-    email: 'margaret.smith@email.com',
-    address: '123 Oak Street, Springfield',
-    emergencyContact: EmergencyContact(
-      name: 'Emily Smith',
-      relation: 'Daughter',
-      phone: '+1 (555) 987-6543',
-    ),
-  );
-
-  // Initialize immediately - no late variables
-  final LobnaVoiceController _voiceController = LobnaVoiceController();
-  final ChatManager _chatManager = ChatManager();
-  final ActivityReminderService _reminderService =
-      ActivityReminderService.instance;
-  static const _lobnaChatId = 'lobna-lenny-thread';
-
-  // Initialize screens in initState - late final ensures initialization happens after constructor
+  late final Patient? _patient;
+  late final String _currentPatientId;
+  late String _assignedDoctorId = '';
+  late String _assignedDoctorName = 'Dr. Sarah Johnson';
   late final List<Widget> _screens;
-  StreamSubscription<ActivityReminder>? _reminderSub;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // Build screens in initState after super.initState() to ensure all dependencies are ready
-    // This guarantees _voiceController and _patient are fully initialized
+    _loadPatientData();
+  }
+
+  void _loadPatientData() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    
+    _patient = const Patient(
+      name: 'Margaret Smith',
+      age: 72,
+      phone: '+1 (555) 123-4567',
+      email: 'margaret.smith@email.com',
+      address: '123 Oak Street, Springfield',
+      emergencyContact: EmergencyContact(
+        name: 'Emily Smith',
+        relation: 'Daughter',
+        phone: '+1 (555) 987-6543',
+      ),
+    );
+
+    _currentPatientId = user?.id ?? '';
+
+    // جيب الدكتور المعين للمريض من Supabase
+    await _fetchAssignedDoctor(_currentPatientId);
+
     _screens = [
       const PatientDashboard(),
       const MemoryActivitiesScreen(),
-      LiveTrackingScreen(voiceController: _voiceController),
-      const ChatWithDoctorScreen(),
-      PatientProfileScreen(patient: _patient),
+      const LiveTrackingScreen(),
+      // تمرير الـ parameters للشات
+      ChatWithDoctorScreen(
+        currentSender: 'patient',
+        chatTitle: _assignedDoctorName,
+        isOnline: true,
+        recipientId: _assignedDoctorId,
+        currentUserId: _currentPatientId,
+        currentUserName: _patient!.name,
+      ),
+      PatientProfileScreen(patient: _patient as Patient?),
     ];
 
-    _reminderSub = _reminderService.onReminderDue.listen(_handleReminderTrigger);
+    if (mounted) setState(() => _isLoading = false);
   }
 
-  @override
-  void dispose() {
-    _reminderSub?.cancel();
-    _voiceController.dispose();
-    super.dispose();
+  Future<void> _fetchAssignedDoctor(String patientId) async {
+    try {
+      print('DEBUG: Fetching doctor for patient: $patientId');
+      
+      // اجلب بيانات المريض مع الدكتور المعين
+      final patientData = await Supabase.instance.client
+          .from('patients')
+          .select('id, name, doctor_id')
+          .eq('id', patientId)
+          .single();
+
+      print('DEBUG: Patient data: $patientData');
+
+      final doctorId = patientData['doctor_id'];
+      print('DEBUG: Doctor ID from patient: $doctorId');
+
+      if (doctorId != null && doctorId.isNotEmpty) {
+        // اجلب بيانات الدكتور
+        final doctorData = await Supabase.instance.client
+            .from('doctors')
+            .select('id, name')
+            .eq('id', doctorId)
+            .single();
+
+        print('DEBUG: Doctor data: $doctorData');
+
+        _assignedDoctorId = doctorData['id'];
+        _assignedDoctorName = doctorData['name'] ?? 'Dr. Sarah Johnson';
+        
+        print('DEBUG: Assigned doctor ID: $_assignedDoctorId');
+        print('DEBUG: Assigned doctor name: $_assignedDoctorName');
+      } else {
+        print('DEBUG: No doctor assigned to patient');
+        _assignedDoctorId = '';
+        _assignedDoctorName = 'Dr. Sarah Johnson';
+      }
+    } catch (e) {
+      print('Error fetching assigned doctor: $e');
+      // قيم افتراضية في حالة الفشل
+      _assignedDoctorId = '';
+      _assignedDoctorName = 'Dr. Sarah Johnson';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: AppTheme.lightGradient,
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.teal500),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: AppTheme.lightGradient,
         ),
-        // CHANGED: IndexedStack لحفظ حالة كل تبويب بدل ما يعاد بناؤه كل مرة
-        // _screens is guaranteed to be initialized in initState() before build() is called
         child: IndexedStack(
           index: _currentIndex,
           children: _screens,
@@ -93,7 +147,7 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -113,94 +167,6 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
               ],
             ),
           ),
-        ),
-      ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FloatingActionButton(
-            heroTag: 'lobnaTextChat',
-            mini: true,
-            onPressed: _openTextChat,
-            child: const Icon(Icons.chat),
-          ),
-          const SizedBox(height: 12),
-          LobnaListenButton(
-            controller: _voiceController,
-            onTranscript: _handleTranscript,
-            onReplyRequested: _handleAssistantReply,
-            chatManager: _chatManager,
-            chatId: _lobnaChatId,
-            patientId: SharedPrefsHelper.getString("patientUid") ?? 
-                      SharedPrefsHelper.getString("userId"),
-          ),
-        ],
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-    );
-  }
-
-  void _handleTranscript(String text) {
-    _chatManager.addMessage(
-      _lobnaChatId,
-      ChatMessage(
-        sender: 'patient',
-        text: text,
-        time: _chatManager.getCurrentTime(),
-      ),
-    );
-  }
-
-  Future<String?> _handleAssistantReply(String transcript) async {
-    final reply = await _voiceController.generateAssistantReply(transcript);
-    _chatManager.addMessage(
-      _lobnaChatId,
-      ChatMessage(
-        sender: 'lobna',
-        text: reply,
-        time: _chatManager.getCurrentTime(),
-      ),
-    );
-    return reply;
-  }
-
-  Future<void> _handleReminderTrigger(ActivityReminder reminder) async {
-    // تحسين النص باللهجة المصرية
-    final timeParts = reminder.time24h.split(':');
-    final hour = timeParts.isNotEmpty ? int.tryParse(timeParts[0]) ?? 8 : 8;
-    final minute = timeParts.length > 1 ? int.tryParse(timeParts[1]) ?? 0 : 0;
-    final time12h = hour > 12 
-        ? '${hour - 12}:${minute.toString().padLeft(2, '0')}'
-        : '$hour:${minute.toString().padLeft(2, '0')}';
-    final amPm = hour >= 12 ? 'بعد الظهر' : 'الصبح';
-    
-    final bodyText = reminder.body.isNotEmpty 
-        ? reminder.body 
-        : 'لو سمحت استعد للنشاط دلوقتي.';
-    
-    final message = LobnaDialectAdapter.ensureMasri(
-        'عندنا نشاط دلوقتي! النشاط "$reminder.title" هيبدأ الساعة $time12h $amPm. $bodyText');
-    
-    _chatManager.addMessage(
-      _lobnaChatId,
-      ChatMessage(
-        sender: 'lobna',
-        text: message,
-        time: _chatManager.getCurrentTime(),
-      ),
-    );
-    await _voiceController.speak(message);
-  }
-
-  void _openTextChat() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => LobnaTextChatScreen(
-          chatManager: _chatManager,
-          voiceController: _voiceController,
-          chatId: _lobnaChatId,
-          patientId: SharedPrefsHelper.getString("patientUid") ??
-              SharedPrefsHelper.getString("userId"),
         ),
       ),
     );

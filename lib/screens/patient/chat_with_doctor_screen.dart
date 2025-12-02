@@ -2,21 +2,29 @@ import 'dart:async';
 
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
 import '../services/chat_manager.dart';
 
 class ChatWithDoctorScreen extends StatefulWidget {
   const ChatWithDoctorScreen({
     super.key,
-    this.currentSender = 'patient', // المرسل الحالي
-    this.chatTitle = 'Dr. Sarah Johnson', // اسم يُعرض في العنوان
-    this.isOnline = true, // حالة الأونلاين
+    this.currentSender = 'patient',
+    this.chatTitle = '',
+    this.isOnline = true,
+    this.recipientId = '',
+    this.currentUserId = '',
+    this.currentUserName = 'Patient',
   });
 
   final String currentSender;
   final String chatTitle;
   final bool isOnline;
+  final String recipientId; // ID الدكتور
+  final String currentUserId; // ID المريض الحالي
+  final String currentUserName; // اسم المريض
 
   @override
   State<ChatWithDoctorScreen> createState() => _ChatWithDoctorScreenState();
@@ -26,55 +34,67 @@ class _ChatWithDoctorScreenState extends State<ChatWithDoctorScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ChatManager _chatManager = ChatManager();
-  final String _chatId = 'patient_doctor'; // معرف المحادثة
+  late final String _chatId;
 
   List<ChatMessage> _messages = [];
   StreamSubscription<List<ChatMessage>>? _sub;
+  bool _isLoading = false;
+  bool _isSending = false;
 
   @override
   void initState() {
     super.initState();
+    _chatId = _generateChatId(widget.currentUserId, widget.recipientId);
+    print('DEBUG Chat ID: $_chatId');
+    print('DEBUG Sender ID: ${widget.currentUserId}');
+    print('DEBUG Recipient ID: ${widget.recipientId}');
+    print('DEBUG Sender Type: ${widget.currentSender}');
     _initializeChat();
   }
 
-  void _initializeChat() {
-    _chatManager.initializeChat(
-      _chatId,
-      [
-        ChatMessage(
-            sender: 'doctor',
-            text: 'Good morning Margaret! How are you feeling today?',
-            time: _chatManager.getCurrentTime()),
-        ChatMessage(
-            sender: 'patient',
-            text: 'Good morning Dr. Johnson! I\'m feeling good today.',
-            time: _chatManager.getCurrentTime()),
-        ChatMessage(
-            sender: 'doctor',
-            text:
-                'That\'s wonderful to hear! Did you complete your memory exercises?',
-            time: _chatManager.getCurrentTime()),
-      ],
-    );
-
-    _sub = _chatManager.watchMessages(_chatId).listen((msgs) {
-      if (!mounted) return;
-      setState(() => _messages = msgs);
-      _scrollToBottom();
-    });
+  String _generateChatId(String userId1, String userId2) {
+    final ids = [userId1, userId2];
+    ids.sort();
+    return '${ids[0]}_${ids[1]}';
   }
 
-  void _sendMessage() {
+  void _initializeChat() {
+    // استخدم polling بدل الـ stream العادي
+    _sub = Stream.periodic(const Duration(milliseconds: 500))
+        .asyncMap((_) async {
+          return await _chatManager.watchMessages(_chatId).first;
+        })
+        .listen((msgs) {
+          if (!mounted) return;
+          setState(() => _messages = msgs);
+          _scrollToBottom();
+        });
+  }
+
+  void _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
 
-    final newMessage = ChatMessage(
-      sender: widget.currentSender, // مرسل ديناميكي
-      text: _messageController.text.trim(),
-      time: _chatManager.getCurrentTime(),
-    );
+    setState(() => _isSending = true);
 
-    _chatManager.addMessage(_chatId, newMessage);
-    _messageController.clear();
+    try {
+      await _chatManager.addMessage(
+        chatId: _chatId,
+        senderId: widget.currentUserId,
+        senderName: widget.currentUserName,
+        senderType: widget.currentSender,
+        receiverId: widget.recipientId,
+        receiverType: widget.currentSender == 'doctor' ? 'patient' : 'doctor',
+        messageText: _messageController.text.trim(),
+      );
+      _messageController.clear();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context)?.defaultError ?? 'Error sending message')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
   }
 
   void _scrollToBottom() {
@@ -121,7 +141,6 @@ class _ChatWithDoctorScreenState extends State<ChatWithDoctorScreen> {
           },
           config: const Config(
             height: 256,
-            checkPlatformCompatibility: true,
             emojiViewConfig: EmojiViewConfig(
               columns: 7,
               emojiSizeMax: 28,
@@ -140,7 +159,6 @@ class _ChatWithDoctorScreenState extends State<ChatWithDoctorScreen> {
               iconColorSelected: AppTheme.teal500,
               backgroundColor: Colors.white,
             ),
-            bottomActionBarConfig: BottomActionBarConfig(enabled: false),
           ),
         ),
       ),
@@ -150,6 +168,7 @@ class _ChatWithDoctorScreenState extends State<ChatWithDoctorScreen> {
   @override
   Widget build(BuildContext context) {
     final statusDotColor = widget.isOnline ? Colors.green : Colors.grey;
+    final localizations = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -189,7 +208,7 @@ class _ChatWithDoctorScreenState extends State<ChatWithDoctorScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.chatTitle, // اسم ديناميكي
+                  widget.chatTitle.isEmpty ? 'Chat' : widget.chatTitle,
                   style: const TextStyle(
                     fontSize: 16,
                     color: Colors.black,
@@ -220,91 +239,99 @@ class _ChatWithDoctorScreenState extends State<ChatWithDoctorScreen> {
                   end: Alignment.bottomRight,
                 ),
               ),
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: _messages.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                            color: AppTheme.gray200,
-                            borderRadius: BorderRadius.circular(12)),
-                        child: const Text('Today',
-                            style: TextStyle(
-                                fontSize: 12, color: AppTheme.gray600)),
+              child: _messages.isEmpty
+                  ? Center(
+                      child: Text(
+                        localizations?.noContent ?? 'No messages yet',
+                        style: const TextStyle(color: AppTheme.gray500),
                       ),
-                    );
-                  }
-
-                  final message = _messages[index - 1];
-                  final isDoctor = message.sender == 'doctor';
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      mainAxisAlignment: isDoctor
-                          ? MainAxisAlignment.start
-                          : MainAxisAlignment.end,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (isDoctor)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 8),
-                            child: CircleAvatar(
-                              radius: 16,
-                              backgroundColor: AppTheme.teal500,
-                              child: Icon(Icons.person,
-                                  color: Colors.white, size: 16),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _messages.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                  color: AppTheme.gray200,
+                                  borderRadius: BorderRadius.circular(12)),
+                              child: const Text('Today',
+                                  style: TextStyle(
+                                      fontSize: 12, color: AppTheme.gray600)),
                             ),
-                          ),
-                        Flexible(
-                          child: Column(
-                            crossAxisAlignment: isDoctor
-                                ? CrossAxisAlignment.start
-                                : CrossAxisAlignment.end,
+                          );
+                        }
+
+                        final message = _messages[index - 1];
+                        final isDoctor = message.senderType == 'doctor';
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Row(
+                            mainAxisAlignment: isDoctor
+                                ? MainAxisAlignment.start
+                                : MainAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: isDoctor
-                                      ? AppTheme.teal500
-                                      : AppTheme.cyan100,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(16),
-                                    topRight: const Radius.circular(16),
-                                    bottomLeft:
-                                        Radius.circular(isDoctor ? 4 : 16),
-                                    bottomRight:
-                                        Radius.circular(isDoctor ? 16 : 4),
+                              if (isDoctor)
+                                const Padding(
+                                  padding: EdgeInsets.only(right: 8),
+                                  child: CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: AppTheme.teal500,
+                                    child: Icon(Icons.person,
+                                        color: Colors.white, size: 16),
                                   ),
                                 ),
-                                child: Text(
-                                  message.text,
-                                  style: TextStyle(
-                                      color: isDoctor
-                                          ? Colors.white
-                                          : AppTheme.teal900,
-                                      fontSize: 14),
+                              Flexible(
+                                child: Column(
+                                  crossAxisAlignment: isDoctor
+                                      ? CrossAxisAlignment.start
+                                      : CrossAxisAlignment.end,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: isDoctor
+                                            ? AppTheme.teal500
+                                            : AppTheme.cyan100,
+                                        borderRadius: BorderRadius.only(
+                                          topLeft: const Radius.circular(16),
+                                          topRight: const Radius.circular(16),
+                                          bottomLeft:
+                                              Radius.circular(isDoctor ? 4 : 16),
+                                          bottomRight:
+                                              Radius.circular(isDoctor ? 16 : 4),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        message.text,
+                                        style: TextStyle(
+                                            color: isDoctor
+                                                ? Colors.white
+                                                : AppTheme.teal900,
+                                            fontSize: 14),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(message.time,
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.gray500)),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(message.time,
-                                  style: const TextStyle(
-                                      fontSize: 11, color: AppTheme.gray500)),
                             ],
                           ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
             ),
           ),
           Container(
@@ -351,14 +378,15 @@ class _ChatWithDoctorScreenState extends State<ChatWithDoctorScreen> {
                   ),
                   const SizedBox(width: 8),
                   GestureDetector(
-                    onTap: _messageController.text.trim().isEmpty
+                    onTap: (_messageController.text.trim().isEmpty || _isSending)
                         ? null
                         : _sendMessage,
                     child: Container(
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        gradient: _messageController.text.trim().isEmpty
+                        gradient: (_messageController.text.trim().isEmpty ||
+                                _isSending)
                             ? LinearGradient(colors: [
                                 AppTheme.teal500.withOpacity(0.5),
                                 AppTheme.teal600.withOpacity(0.5)
@@ -366,7 +394,17 @@ class _ChatWithDoctorScreenState extends State<ChatWithDoctorScreen> {
                             : AppTheme.tealGradient,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.send, color: Colors.white),
+                      child: _isSending
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Icon(Icons.send, color: Colors.white),
                     ),
                   ),
                 ],
@@ -383,6 +421,7 @@ class _ChatWithDoctorScreenState extends State<ChatWithDoctorScreen> {
     _sub?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
+    _chatManager.disposeChat(_chatId);
     super.dispose();
   }
 }
