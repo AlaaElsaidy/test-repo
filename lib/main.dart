@@ -51,12 +51,16 @@ class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  MyAppState createState() => MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class MyAppState extends State<MyApp> {
   StreamSubscription? _linkSubscription;
   late AppLinks _appLinks;
+
+  // Theme & Locale state
+  ThemeMode _themeMode = ThemeMode.system;
+  Locale _locale = const Locale('en');
 
   @override
   void initState() {
@@ -64,6 +68,7 @@ class _MyAppState extends State<MyApp> {
     _appLinks = AppLinks();
     _handleInitialLink();
     _handleIncomingLinks();
+    _loadAppSettings();
   }
 
   void _handleInitialLink() async {
@@ -115,6 +120,126 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  // -------- App settings: theme & language --------
+  Future<void> _loadAppSettings() async {
+    try {
+      // Generic theme (used before login or when no user-specific setting)
+      final themeString = SharedPrefsHelper.getString('themeMode');
+      switch (themeString) {
+        case 'light':
+          _themeMode = ThemeMode.light;
+          break;
+        case 'dark':
+          _themeMode = ThemeMode.dark;
+          break;
+        case 'system':
+        case null:
+        default:
+          _themeMode = ThemeMode.system;
+      }
+
+      // Generic language
+      final langCode = SharedPrefsHelper.getString('languageCode');
+      if (langCode != null && langCode.isNotEmpty) {
+        _locale = Locale(langCode);
+      } else {
+        _locale = const Locale('en');
+      }
+
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Error loading app settings: $e');
+    }
+  }
+
+  /// تحميل إعدادات مستخدم معيّن (لكل دور / يوزر)
+  Future<void> loadUserSettings({
+    required String role, // 'doctor' | 'patient' | 'family'
+    required String userId,
+  }) async {
+    try {
+      final themeKey = 'themeMode_${role}_$userId';
+      final langKey = 'languageCode_${role}_$userId';
+
+      final userTheme = SharedPrefsHelper.getString(themeKey);
+      final userLang = SharedPrefsHelper.getString(langKey);
+
+      if (userTheme != null || userLang != null) {
+        setState(() {
+          if (userTheme != null) {
+            switch (userTheme) {
+              case 'light':
+                _themeMode = ThemeMode.light;
+                break;
+              case 'dark':
+                _themeMode = ThemeMode.dark;
+                break;
+              case 'system':
+              default:
+                _themeMode = ThemeMode.system;
+            }
+          }
+          if (userLang != null && userLang.isNotEmpty) {
+            _locale = Locale(userLang);
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user settings: $e');
+    }
+  }
+
+  /// Call this from anywhere (via context.findAncestorStateOfType) to change theme
+  Future<void> setThemeMode(
+    ThemeMode mode, {
+    String? role,
+    String? userId,
+  }) async {
+    setState(() {
+      _themeMode = mode;
+    });
+    final value = switch (mode) {
+      ThemeMode.light => 'light',
+      ThemeMode.dark => 'dark',
+      ThemeMode.system => 'system',
+    };
+
+    // لو فيه يوزر محدد، خزّنه له هو؛ وإلا خزّنه كإعداد عام
+    if (role != null && userId != null) {
+      await SharedPrefsHelper.saveString(
+        'themeMode_${role}_$userId',
+        value,
+      );
+    } else {
+      await SharedPrefsHelper.saveString('themeMode', value);
+    }
+  }
+
+  /// Call this to change app language (e.g. Locale('ar') or Locale('en'))
+  Future<void> setLocale(
+    Locale locale, {
+    String? role,
+    String? userId,
+  }) async {
+    setState(() {
+      _locale = locale;
+    });
+
+    if (role != null && userId != null) {
+      await SharedPrefsHelper.saveString(
+        'languageCode_${role}_$userId',
+        locale.languageCode,
+      );
+    } else {
+      await SharedPrefsHelper.saveString(
+        'languageCode',
+        locale.languageCode,
+      );
+    }
+  }
+
   @override
   void dispose() {
     _linkSubscription?.cancel();
@@ -138,8 +263,8 @@ class _MyAppState extends State<MyApp> {
         onGenerateRoute: AppRouter.onGenerate,
         // home: Builder(builder: (context) => DoctorSelectionScreen(),),
         supportedLocales: const [Locale("en"), Locale("ar")],
-        locale: const Locale("en"),
-        themeMode: ThemeMode.system,
+        locale: _locale,
+        themeMode: _themeMode,
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
       ),

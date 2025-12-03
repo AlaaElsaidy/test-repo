@@ -38,6 +38,15 @@ class AppTheme {
     end: Alignment.bottomRight,
   );
 
+  static const LinearGradient darkGradient = LinearGradient(
+    colors: [
+      Color(0xFF020617), // deep slate
+      Color(0xFF0F172A),
+    ],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
   static final ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(
@@ -87,6 +96,78 @@ class AppTheme {
       border: OutlineInputBorder(
         borderRadius: BorderRadius.all(Radius.circular(16)),
         borderSide: BorderSide.none,
+      ),
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    ),
+  );
+
+  static final ThemeData darkTheme = ThemeData(
+    useMaterial3: true,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: tealPrimary,
+      brightness: Brightness.dark,
+    ).copyWith(
+      primary: tealPrimary,
+      secondary: cyanPrimary,
+      surface: const Color(0xFF020617),
+      background: const Color(0xFF020617),
+    ),
+    scaffoldBackgroundColor: const Color(0xFF020617),
+    canvasColor: const Color(0xFF020617),
+    dialogBackgroundColor: const Color(0xFF020617),
+    fontFamily: 'System',
+
+    // Softer white text for better readability
+    textTheme: Typography.whiteMountainView.apply(
+      bodyColor: Colors.white.withOpacity(0.92),
+      displayColor: Colors.white.withOpacity(0.96),
+    ),
+
+    appBarTheme: const AppBarTheme(
+      elevation: 0,
+      centerTitle: true,
+      backgroundColor: Colors.transparent,
+      foregroundColor: Colors.white,
+      systemOverlayStyle: SystemUiOverlayStyle.light,
+    ),
+
+    cardTheme: CardThemeData(
+      color: const Color(0xFF0B1120),
+      elevation: 3,
+      shadowColor: Colors.black.withOpacity(0.5),
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        side: BorderSide(color: Colors.white.withOpacity(0.06)),
+      ),
+      clipBehavior: Clip.antiAlias,
+    ),
+
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        backgroundColor: tealPrimary,
+        foregroundColor: Colors.white,
+      ),
+    ),
+
+    inputDecorationTheme: const InputDecorationTheme(
+      filled: true,
+      fillColor: Color(0xFF020617),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+        borderSide: BorderSide(color: Color(0xFF1F2937)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+        borderSide: BorderSide(color: Color(0xFF1F2937)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+        borderSide: BorderSide(color: tealPrimary, width: 1.4),
       ),
       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     ),

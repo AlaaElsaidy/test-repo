@@ -372,10 +372,17 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   String _timeAgo(DateTime? t) {
     if (t == null) return '—';
     final d = DateTime.now().difference(t);
-    if (d.inMinutes < 1) return 'Just now';
-    if (d.inMinutes < 60) return '${d.inMinutes} mins ago';
-    if (d.inHours < 24) return '${d.inHours} hours ago';
-    return '${d.inDays} days ago';
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    if (d.inMinutes < 1) {
+      return isAr ? 'الآن' : 'Just now';
+    }
+    if (d.inMinutes < 60) {
+      return isAr ? '${d.inMinutes} دقيقة مضت' : '${d.inMinutes} mins ago';
+    }
+    if (d.inHours < 24) {
+      return isAr ? '${d.inHours} ساعة مضت' : '${d.inHours} hours ago';
+    }
+    return isAr ? '${d.inDays} يوم مضى' : '${d.inDays} days ago';
   }
 
   double _deg2rad(double d) => d * pi / 180.0;
@@ -434,7 +441,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         markerId: const MarkerId('current_location'),
         position: LatLng(_pos!.latitude, _pos!.longitude),
         infoWindow: InfoWindow(
-          title: 'You are here',
+          title: Localizations.localeOf(context).languageCode == 'ar'
+              ? 'أنت هنا'
+              : 'You are here',
           snippet: _address ??
               '${_pos!.latitude.toStringAsFixed(5)}, ${_pos!.longitude.toStringAsFixed(5)}',
         ),
@@ -447,12 +456,15 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     final statusColor = _insideAnyZone ? Colors.green : Colors.red;
-    final statusText = _insideAnyZone ? 'Safe Zone' : 'Outside Zone';
+    final statusText =
+        _insideAnyZone ? (isAr ? 'منطقة آمنة' : 'Safe Zone') : (isAr ? 'خارج المنطقة الآمنة' : 'Outside Zone');
 
     final addressText = _address ??
         (_pos == null
-            ? 'Fetching location...'
+            ? (isAr ? 'جارى تحديد الموقع...' : 'Fetching location...')
             : '${_pos!.latitude.toStringAsFixed(5)}, ${_pos!.longitude.toStringAsFixed(5)}');
 
     return SafeArea(
@@ -571,9 +583,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      'Current Location',
-                                      style: TextStyle(
+                                    Text(
+                                      isAr ? 'الموقع الحالى' : 'Current Location',
+                                      style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
                                         color: AppTheme.teal900,
@@ -590,8 +602,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                     const SizedBox(height: 4),
                                     Text(
                                       _insideAnyZone
-                                          ? 'Within safe zone'
-                                          : 'Outside safe zone',
+                                          ? (isAr ? 'داخل المنطقة الآمنة' : 'Within safe zone')
+                                          : (isAr ? 'خارج المنطقة الآمنة' : 'Outside safe zone'),
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: _insideAnyZone
@@ -628,9 +640,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Last Updated',
-                                  style: TextStyle(
+                                      Text(
+                                        isAr ? 'آخر تحديث' : 'Last Updated',
+                                        style: const TextStyle(
                                       fontSize: 14, color: AppTheme.teal900),
                                 ),
                                 Text(
@@ -655,7 +667,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                   ),
                                 )
                               : const Icon(Icons.refresh),
-                          label: Text(_loading ? 'Refreshing' : 'Refresh'),
+                          label: Text(
+                            _loading
+                                ? (isAr ? 'جارى التحديث' : 'Refreshing')
+                                : (isAr ? 'تحديث' : 'Refresh'),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.teal500,
                             foregroundColor: Colors.white,
@@ -688,22 +704,24 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                     color: Colors.white),
                               ),
                               const SizedBox(width: 16),
-                              const Expanded(
+                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Emergency Alert',
-                                      style: TextStyle(
+                                      isAr ? 'تنبيه طوارئ' : 'Emergency Alert',
+                                      style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.orange,
                                       ),
                                     ),
-                                    SizedBox(height: 8),
+                                    const SizedBox(height: 8),
                                     Text(
-                                      'If you feel lost, tap the button below to notify your caregiver with your current location.',
-                                      style: TextStyle(
+                                      isAr
+                                          ? 'لو حاسس إنك تايه، اضغط على الزر لإرسال موقعك الحالى لولى الأمر.'
+                                          : 'If you feel lost, tap the button below to notify your caregiver with your current location.',
+                                      style: const TextStyle(
                                           fontSize: 14, color: Colors.orange),
                                     ),
                                   ],
@@ -723,7 +741,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                     padding: const EdgeInsets.symmetric(
                                         vertical: 14),
                                   ),
-                                  child: const Text('Send via WhatsApp/SMS'),
+                                  child: Text(
+                                    isAr
+                                        ? 'إرسال عبر واتساب / رسالة'
+                                        : 'Send via WhatsApp/SMS',
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -733,7 +755,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                     ? () => _callNumber(_emergencyPhone!)
                                     : null,
                                 icon: const Icon(Icons.call),
-                                label: const Text('Call'),
+                                label: Text(isAr ? 'اتصال' : 'Call'),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.orange,
                                   side: const BorderSide(color: Colors.orange),

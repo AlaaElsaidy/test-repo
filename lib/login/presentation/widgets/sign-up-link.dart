@@ -5,14 +5,16 @@ import '../../../config/router/routes.dart';
 import '../../../config/utilis/app_colors.dart';
 
 Widget buildSignUpLink(BuildContext context) {
+  final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
   return Center(
     child: RichText(
       text: TextSpan(
         style: TextStyle(fontSize: context.sp(16)),
         children: [
-          const TextSpan(
-            text: "Don't have an account? ",
-            style: TextStyle(
+          TextSpan(
+            text: isAr ? "ما عندكش حساب؟ " : "Don't have an account? ",
+            style: const TextStyle(
                 fontWeight: FontWeight.w600, color: AppColors.gray500),
           ),
           WidgetSpan(
@@ -21,7 +23,7 @@ Widget buildSignUpLink(BuildContext context) {
                 Navigator.pushNamed(context, AppRoutes.signUp);
               },
               child: Text(
-                'Sign up',
+                isAr ? 'سجّل حساب جديد' : 'Sign up',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: context.sp(16),

@@ -77,10 +77,13 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.lightGradient,
+        decoration: BoxDecoration(
+          gradient: isDark ? AppTheme.darkGradient : AppTheme.lightGradient,
         ),
         // CHANGED: IndexedStack لحفظ حالة كل تبويب بدل ما يعاد بناؤه كل مرة
         child: IndexedStack(
@@ -109,11 +112,15 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.home, 'Home'),
-                _buildNavItem(1, Icons.psychology, 'Activities'),
-                _buildNavItem(2, Icons.location_on, 'Tracking'),
-                _buildNavItem(3, Icons.chat_bubble, 'Chat'),
-                _buildNavItem(4, Icons.person, 'Profile'),
+                _buildNavItem(0, Icons.home, isAr ? 'الرئيسية' : 'Home'),
+                _buildNavItem(
+                    1, Icons.psychology, isAr ? 'الأنشطة' : 'Activities'),
+                _buildNavItem(
+                    2, Icons.location_on, isAr ? 'الموقع' : 'Tracking'),
+                _buildNavItem(
+                    3, Icons.chat_bubble, isAr ? 'المحادثة' : 'Chat'),
+                _buildNavItem(
+                    4, Icons.person, isAr ? 'الملف الشخصي' : 'Profile'),
               ],
             ),
           ),

@@ -19,6 +19,7 @@ import '../../screens/patient/invitations/data/invitation-repo.dart';
 import '../../screens/patient/invitations/presentation/cubit/invitation_cubit.dart';
 import '../../screens/patient/invitations/presentation/cubit/invitation_state.dart';
 import '../../theme/app_theme.dart';
+import '../../main.dart';
 
 class FamilyProfileScreen extends StatefulWidget {
   const FamilyProfileScreen({super.key});
@@ -516,9 +517,11 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Edit Contact Info',
-                style: TextStyle(
+              Text(
+                Localizations.localeOf(ctx).languageCode == 'ar'
+                    ? 'تعديل بيانات الاتصال'
+                    : 'Edit Contact Info',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.teal900,
@@ -527,27 +530,35 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: phoneCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Phone number',
-                  prefixIcon: Icon(Icons.phone),
+                decoration: InputDecoration(
+                  labelText: Localizations.localeOf(ctx).languageCode == 'ar'
+                      ? 'رقم الهاتف'
+                      : 'Phone number',
+                  prefixIcon: const Icon(Icons.phone),
                 ),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: emailCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Email address',
-                  prefixIcon: Icon(Icons.email),
+                decoration: InputDecoration(
+                  labelText: Localizations.localeOf(ctx).languageCode == 'ar'
+                      ? 'البريد الإلكترونى'
+                      : 'Email address',
+                  prefixIcon: const Icon(Icons.email),
                 ),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Email is required';
+                    return Localizations.localeOf(ctx).languageCode == 'ar'
+                        ? 'البريد الإلكترونى مطلوب'
+                        : 'Email is required';
                   }
                   final regex =
                       RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
                   if (!regex.hasMatch(value.trim())) {
-                    return 'Enter a valid email';
+                    return Localizations.localeOf(ctx).languageCode == 'ar'
+                        ? 'أدخل بريد إلكترونى صحيح'
+                        : 'Enter a valid email';
                   }
                   return null;
                 },
@@ -577,7 +588,11 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                       _showSnack('Failed to update: $e');
                     }
                   },
-                  child: const Text('Save Changes'),
+                  child: Text(
+                    Localizations.localeOf(ctx).languageCode == 'ar'
+                        ? 'حفظ التغييرات'
+                        : 'Save Changes',
+                  ),
                 ),
               ),
             ],
@@ -816,12 +831,16 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
           child: FutureBuilder<_ProfileData?>(
             future: _profileFuture,
             builder: (context, snapshot) {
+              final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
               if (snapshot.hasError) {
                 return _ProfileErrorView(
-                  message: 'Failed to load profile data',
+                  message: isAr
+                      ? 'فشل تحميل بيانات الملف الشخصى'
+                      : 'Failed to load profile data',
                   onRetry: () {
                     setState(() {
                       _profileFuture = _loadProfileData();
@@ -832,7 +851,9 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
               final profile = snapshot.data;
               if (profile == null) {
                 return _ProfileErrorView(
-                  message: 'No profile data available',
+                  message: isAr
+                      ? 'لا توجد بيانات ملف شخصى متاحة'
+                      : 'No profile data available',
                   onRetry: () {
                     setState(() {
                       _profileFuture = _loadProfileData();
@@ -840,6 +861,10 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                   },
                 );
               }
+
+              final appState = context.findAncestorStateOfType<MyAppState>();
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              final localeCode = Localizations.localeOf(context).languageCode;
 
               return RefreshIndicator(
                 onRefresh: () async {
@@ -853,13 +878,61 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      _ProfileHeader(
-                        userName: profile.userName,
-                        caregiverRole: profile.user?['role'] ?? 'Caregiver',
-                        caringFor: profile.caringForName,
-                        avatarUrl: profile.familyImageUrl,
-                        uploading: _uploadingPhoto,
-                        onAvatarTap: () => _changeAvatar(profile),
+                      // Header + theme/language controls for this family member
+                      Column(
+                        children: [
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextButton.icon(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppTheme.teal900,
+                                  ),
+                                  onPressed: () {
+                                    if (appState == null) return;
+                                    final newLocale = localeCode == 'ar'
+                                        ? const Locale('en')
+                                        : const Locale('ar');
+                                    appState.setLocale(
+                                      newLocale,
+                                      role: 'family',
+                                      userId: profile.userId,
+                                    );
+                                  },
+                                  icon: const Icon(Icons.language),
+                                  label: Text(
+                                      localeCode == 'ar' ? 'English' : 'عربي'),
+                                ),
+                                IconButton(
+                                  tooltip: isDark ? 'Light mode' : 'Dark mode',
+                                  onPressed: () {
+                                    if (appState == null) return;
+                                    appState.setThemeMode(
+                                      isDark ? ThemeMode.light : ThemeMode.dark,
+                                      role: 'family',
+                                      userId: profile.userId,
+                                    );
+                                  },
+                                  icon: Icon(
+                                    isDark ? Icons.light_mode : Icons.dark_mode,
+                                    color: AppTheme.teal900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          _ProfileHeader(
+                            userName: profile.userName,
+                            caregiverRole:
+                                profile.user?['role'] ?? 'Caregiver',
+                            caringFor: profile.caringForName,
+                            avatarUrl: profile.familyImageUrl,
+                            uploading: _uploadingPhoto,
+                            onAvatarTap: () => _changeAvatar(profile),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       _PatientCard(patients: profile.patients),
@@ -981,6 +1054,7 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     ImageProvider? avatarImage;
     if (avatarUrl != null && avatarUrl!.isNotEmpty) {
       avatarImage = NetworkImage(avatarUrl!);
@@ -1061,7 +1135,7 @@ class _ProfileHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'Caring for $caringFor',
+                isAr ? 'ترعى $caringFor' : 'Caring for $caringFor',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14,
@@ -1082,6 +1156,7 @@ class _PatientCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     Map<String, dynamic>? firstPatient;
     if (patients.isNotEmpty) {
       firstPatient = patients.first['patients'] as Map<String, dynamic>?;
@@ -1093,9 +1168,9 @@ class _PatientCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Primary Patient',
-              style: TextStyle(
+            Text(
+              isAr ? 'المريض الرئيسى' : 'Primary Patient',
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.teal900,
@@ -1103,9 +1178,11 @@ class _PatientCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             if (firstPatient == null)
-              const Text(
-                'No patients linked yet. Invite a patient to start tracking.',
-                style: TextStyle(color: AppTheme.gray600),
+              Text(
+                isAr
+                    ? 'لا يوجد مرضى مرتبطون بعد. قم بدعوة مريض لبدأ المتابعة.'
+                    : 'No patients linked yet. Invite a patient to start tracking.',
+                style: const TextStyle(color: AppTheme.gray600),
               )
             else
               Row(
@@ -1169,12 +1246,14 @@ class _ContactInfoCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'My Contact Information',
+                    Localizations.localeOf(context).languageCode == 'ar'
+                        ? 'معلومات الاتصال الخاصة بى'
+                        : 'My Contact Information',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.teal900,
@@ -1183,7 +1262,11 @@ class _ContactInfoCard extends StatelessWidget {
                 ),
                 TextButton(
                   onPressed: onEdit,
-                  child: const Text('Edit'),
+                  child: Text(
+                    Localizations.localeOf(context).languageCode == 'ar'
+                        ? 'تعديل'
+                        : 'Edit',
+                  ),
                 ),
               ],
             ),
@@ -1340,7 +1423,11 @@ class _ProfileErrorView extends StatelessWidget {
             ElevatedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+              label: Text(
+                Localizations.localeOf(context).languageCode == 'ar'
+                    ? 'إعادة المحاولة'
+                    : 'Retry',
+              ),
             ),
           ],
         ),

@@ -128,6 +128,7 @@ class FamilyDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -142,7 +143,7 @@ class FamilyDashboard extends StatelessWidget {
                   future: _loadLinkedPatients(),
                   builder: (context, patientsSnapshot) {
                     final userName =
-                        userSnapshot.data?['name'] as String? ?? 'User';
+                        userSnapshot.data?['name'] as String? ?? (isAr ? 'المستخدم' : 'User');
                     final avatarUrl =
                         userSnapshot.data?['image_url'] as String?;
                     final patients = patientsSnapshot.data ?? [];
@@ -183,7 +184,7 @@ class FamilyDashboard extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Hello, $userName',
+                                      isAr ? 'مرحباً، $userName' : 'Hello, $userName',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 24,
@@ -193,8 +194,12 @@ class FamilyDashboard extends StatelessWidget {
                                     const SizedBox(height: 4),
                                     Text(
                                       patientName != null
-                                          ? 'Caring for $patientName'
-                                          : 'No patients linked yet',
+                                          ? (isAr
+                                              ? 'ترعى $patientName'
+                                              : 'Caring for $patientName')
+                                          : (isAr
+                                              ? 'لا يوجد مرضى مرتبطون بعد'
+                                              : 'No patients linked yet'),
                                       style: const TextStyle(
                                         color: Color(0xFFCFFAFE),
                                         fontSize: 16,
@@ -230,9 +235,11 @@ class FamilyDashboard extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              const Text(
-                                'Everything is going well today',
-                                style: TextStyle(
+                              Text(
+                                isAr
+                                    ? 'كل شىء على ما يرام اليوم'
+                                    : 'Everything is going well today',
+                                style: const TextStyle(
                                   color: Color(0xFFCFFAFE),
                                   fontSize: 14,
                                 ),
@@ -271,9 +278,9 @@ class FamilyDashboard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
-                          'Linked Patients',
-                          style: TextStyle(
+                        Text(
+                          isAr ? 'المرضى المرتبطون' : 'Linked Patients',
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.teal900,
@@ -293,18 +300,20 @@ class FamilyDashboard extends StatelessWidget {
                         }
 
                         if (snapshot.hasError) {
-                          return const Text(
-                            'Error loading patients',
-                            style: TextStyle(color: Colors.red),
+                          return Text(
+                            isAr ? 'خطأ فى تحميل المرضى' : 'Error loading patients',
+                            style: const TextStyle(color: Colors.red),
                           );
                         }
 
                         final patients = snapshot.data ?? [];
 
                         if (patients.isEmpty) {
-                          return const Text(
-                            'No patients linked yet',
-                            style: TextStyle(
+                          return Text(
+                            isAr
+                                ? 'لا يوجد مرضى مرتبطون بعد'
+                                : 'No patients linked yet',
+                            style: const TextStyle(
                               fontSize: 14,
                               color: AppTheme.gray500,
                             ),
@@ -340,7 +349,7 @@ class FamilyDashboard extends StatelessWidget {
                                   ),
                           ),
                           title: Text(
-                            patient['name'] ?? 'Unknown',
+                            patient['name'] ?? (isAr ? 'غير معروف' : 'Unknown'),
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                             ),
@@ -365,7 +374,10 @@ class FamilyDashboard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            _DoctorAdviceCard(loadAdvice: _loadDoctorAdvice, onOpenVideo: _openAdviceVideo),
+            _DoctorAdviceCard(
+              loadAdvice: _loadDoctorAdvice,
+              onOpenVideo: _openAdviceVideo,
+            ),
             const SizedBox(height: 16),
 
             // Video Tips section - Show videos from doctor advice

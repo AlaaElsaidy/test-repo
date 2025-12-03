@@ -10,6 +10,8 @@ class DoctorChatScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return DefaultTabController(
       length: 2,
       child: SafeArea(
@@ -37,10 +39,10 @@ class DoctorChatScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Messages',
-                      style: TextStyle(
+                      isAr ? 'الرسائل' : 'Messages',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -67,13 +69,13 @@ class DoctorChatScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const TabBar(
+              child: TabBar(
                 labelColor: AppTheme.teal600,
                 unselectedLabelColor: AppTheme.gray500,
                 indicatorColor: AppTheme.teal500,
                 tabs: [
-                  Tab(text: 'Patients'),
-                  Tab(text: 'Families'),
+                  Tab(text: isAr ? 'المرضى' : 'Patients'),
+                  Tab(text: isAr ? 'العائلات' : 'Families'),
                 ],
               ),
             ),

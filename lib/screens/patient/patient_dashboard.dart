@@ -176,8 +176,13 @@ class _PatientDashboardState extends State<PatientDashboard> {
       if (_timeLeft <= 0) {
         t.cancel();
         _lock = true;
+        final isAr = Localizations.localeOf(context).languageCode == 'ar';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Time's up! Try again ⏳")),
+          SnackBar(
+            content: Text(
+              isAr ? 'انتهى الوقت! حاول مرة أخرى ⏳' : "Time's up! Try again ⏳",
+            ),
+          ),
         );
         setState(() {});
         return;
@@ -239,8 +244,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
         }
       }
       final msg = _mode == GameMode.challenge
-          ? "Well done! You matched all pairs 🎉  ${'⭐' * stars}"
-          : "Well done! You matched all pairs 🎉";
+          ? (Localizations.localeOf(context).languageCode == 'ar'
+              ? "أحسنت! طابقت كل الأزواج 🎉  ${'⭐' * stars}"
+              : "Well done! You matched all pairs 🎉  ${'⭐' * stars}")
+          : (Localizations.localeOf(context).languageCode == 'ar'
+              ? "أحسنت! طابقت كل الأزواج 🎉"
+              : "Well done! You matched all pairs 🎉");
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg)),
@@ -318,6 +327,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     final ImageProvider? avatarImage;
     if (_avatarFile != null) {
       avatarImage = FileImage(_avatarFile!);
@@ -390,9 +401,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Hi, Welcome Back',
-                          style: TextStyle(
+                        Text(
+                          isAr ? 'أهلاً، سعيدون برؤيتك مرة أخرى' : 'Hi, Welcome Back',
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -421,7 +432,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
               runSpacing: 8,
               children: [
                 ChoiceChip(
-                  label: const Text('Calm'),
+                  label: Text(isAr ? 'هادئ' : 'Calm'),
                   selected: _mode == GameMode.calm,
                   onSelected: (v) {
                     if (_mode != GameMode.calm) {
@@ -431,7 +442,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   },
                 ),
                 ChoiceChip(
-                  label: const Text('Challenge'),
+                  label: Text(isAr ? 'تحدي' : 'Challenge'),
                   selected: _mode == GameMode.challenge,
                   onSelected: (v) {
                     if (_mode != GameMode.challenge) {
@@ -465,7 +476,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         color: AppTheme.teal600, size: 18),
                     const SizedBox(width: 6),
                     Text(
-                      'Memorize the cards… ${_previewLeft}s',
+                      isAr
+                          ? 'حاول تفتكر الكروت... ${_previewLeft}ث'
+                          : 'Memorize the cards… ${_previewLeft}s',
                       style: const TextStyle(color: AppTheme.teal600),
                     ),
                   ],
@@ -554,7 +567,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
               child: ElevatedButton.icon(
                 onPressed: _initGame,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Play Again'),
+                label: Text(
+                  isAr ? 'العب مرة أخرى' : 'Play Again',
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.teal600,
                   foregroundColor: Colors.white,

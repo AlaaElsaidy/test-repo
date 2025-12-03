@@ -512,6 +512,8 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
   // ================= Build =================
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -525,23 +527,25 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
-                        'Doctor\'s Advice',
+                        isAr ? 'نصائح الطبيب' : 'Doctor\'s Advice',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.teal900,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        'Upload a video from phone and send to relatives',
+                        isAr
+                            ? 'ارفع فيديو من الهاتف وأرسله إلى الأقارب'
+                            : 'Upload a video from phone and send to relatives',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 14, color: AppTheme.gray600),
+                        style: const TextStyle(fontSize: 14, color: AppTheme.gray600),
                       ),
                     ],
                   ),
@@ -575,13 +579,13 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                 },
                 borderRadius: BorderRadius.circular(20),
                 constraints: const BoxConstraints(minHeight: 40, minWidth: 120),
-                children: const [
+                children: [
                   Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: Text('Create')),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text(isAr ? 'إنشاء' : 'Create')),
                   Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: Text('My Advice')),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text(isAr ? 'نصائحي' : 'My Advice')),
                 ],
               ),
             ),
@@ -603,9 +607,11 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Create Advice',
-              style: TextStyle(
+            Text(
+              Localizations.localeOf(context).languageCode == 'ar'
+                  ? 'إنشاء نصيحة'
+                  : 'Create Advice',
+              style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.teal900),
@@ -624,17 +630,22 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                   color: Colors.orange[50],
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
-                  'No family members assigned to you yet. Once a family is linked, you can send advice here.',
-                  style: TextStyle(fontSize: 13, color: AppTheme.teal900),
+                child: Text(
+                  Localizations.localeOf(context).languageCode == 'ar'
+                      ? 'لا يوجد أفراد عائلة مربوطين بك بعد. عند ربط عائلة يمكنك إرسال النصائح لهم من هنا.'
+                      : 'No family members assigned to you yet. Once a family is linked, you can send advice here.',
+                  style: const TextStyle(fontSize: 13, color: AppTheme.teal900),
                 ),
               )
             else
               DropdownButtonFormField<String>(
                 value: _selectedFamilyId,
-                decoration: const InputDecoration(
-                  labelText: 'Select family',
-                  prefixIcon: Icon(Icons.family_restroom),
+                decoration: InputDecoration(
+                  labelText:
+                      Localizations.localeOf(context).languageCode == 'ar'
+                          ? 'اختر العائلة'
+                          : 'Select family',
+                  prefixIcon: const Icon(Icons.family_restroom),
                   filled: true,
                 ),
                 items: _families
@@ -762,7 +773,11 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
             child: ElevatedButton.icon(
               onPressed: _beginAddTip,
               icon: const Icon(Icons.add),
-              label: const Text('Add tip'),
+              label: Text(
+                Localizations.localeOf(context).languageCode == 'ar'
+                    ? 'إضافة نصيحة'
+                    : 'Add tip',
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.teal600,
                 foregroundColor: Colors.white,
@@ -780,9 +795,12 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
               TextField(
                 focusNode: _tipFocus,
                 controller: _tipCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Write a tip',
-                  prefixIcon: Icon(Icons.lightbulb),
+                decoration: InputDecoration(
+                  labelText:
+                      Localizations.localeOf(context).languageCode == 'ar'
+                          ? 'اكتب نصيحة'
+                          : 'Write a tip',
+                  prefixIcon: const Icon(Icons.lightbulb),
                   filled: true,
                 ),
                 onSubmitted: (_) => _addTip(),
@@ -797,7 +815,11 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                       child: ElevatedButton.icon(
                         onPressed: _addTip,
                         icon: const Icon(Icons.check),
-                        label: const Text('Add'),
+                        label: Text(
+                          Localizations.localeOf(context).languageCode == 'ar'
+                              ? 'إضافة'
+                              : 'Add',
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.teal600,
                           foregroundColor: Colors.white,
@@ -812,7 +834,11 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                       child: OutlinedButton.icon(
                         onPressed: _cancelAddTip,
                         icon: const Icon(Icons.close),
-                        label: const Text('Done'),
+                        label: Text(
+                          Localizations.localeOf(context).languageCode == 'ar'
+                              ? 'تم'
+                              : 'Done',
+                        ),
                       ),
                     ),
                   ),
@@ -829,9 +855,12 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
               child: TextField(
                 focusNode: _tipFocus,
                 controller: _tipCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Write a tip',
-                  prefixIcon: Icon(Icons.lightbulb),
+                decoration: InputDecoration(
+                  labelText:
+                      Localizations.localeOf(context).languageCode == 'ar'
+                          ? 'اكتب نصيحة'
+                          : 'Write a tip',
+                  prefixIcon: const Icon(Icons.lightbulb),
                   filled: true,
                 ),
                 onSubmitted: (_) => _addTip(),
@@ -846,7 +875,12 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                 child: ElevatedButton.icon(
                   onPressed: _addTip,
                   icon: const Icon(Icons.check),
-                  label: const Text('Add', overflow: TextOverflow.ellipsis),
+                  label: Text(
+                    Localizations.localeOf(context).languageCode == 'ar'
+                        ? 'إضافة'
+                        : 'Add',
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.teal600,
                     foregroundColor: Colors.white,
@@ -860,7 +894,11 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
               child: OutlinedButton.icon(
                 onPressed: _cancelAddTip,
                 icon: const Icon(Icons.close),
-                label: const Text('Done'),
+                label: Text(
+                  Localizations.localeOf(context).languageCode == 'ar'
+                      ? 'تم'
+                      : 'Done',
+                ),
               ),
             ),
           ],
@@ -880,7 +918,13 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
             onPressed: _sending || _families.isEmpty ? null : _sendToRelative,
             icon: const Icon(Icons.send),
             label: Text(
-              _sending ? 'Sending...' : 'Send to relative',
+              _sending
+                  ? (Localizations.localeOf(context).languageCode == 'ar'
+                      ? 'جارى الإرسال...'
+                      : 'Sending...')
+                  : (Localizations.localeOf(context).languageCode == 'ar'
+                      ? 'إرسال للأقارب'
+                      : 'Send to relative'),
               overflow: TextOverflow.ellipsis,
             ),
             style: ElevatedButton.styleFrom(
@@ -911,6 +955,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
     }
 
     if (_adviceList.isEmpty) {
+      final isAr = Localizations.localeOf(context).languageCode == 'ar';
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
@@ -918,17 +963,19 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
           color: AppTheme.gray100,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Column(
+        child: Column(
           children: [
             Text(
-              'No advice yet',
-              style: TextStyle(
+              isAr ? 'لا توجد نصائح بعد' : 'No advice yet',
+              style: const TextStyle(
                   fontWeight: FontWeight.w600, color: AppTheme.teal900),
             ),
-            SizedBox(height: 6),
+            const SizedBox(height: 6),
             Text(
-              'Add a few tips, attach a video, then send to relatives.',
-              style: TextStyle(fontSize: 12, color: AppTheme.gray600),
+              isAr
+                  ? 'أضف بعض النصائح، وارفق فيديو، ثم أرسلها إلى الأقارب.'
+                  : 'Add a few tips, attach a video, then send to relatives.',
+              style: const TextStyle(fontSize: 12, color: AppTheme.gray600),
               textAlign: TextAlign.center,
             ),
           ],

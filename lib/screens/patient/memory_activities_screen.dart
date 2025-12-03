@@ -86,7 +86,9 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
       
       if (userId == null) {
         setState(() {
-          _error = 'User ID not found';
+          _error = Localizations.localeOf(context).languageCode == 'ar'
+              ? 'لم يتم العثور على هوية المستخدم'
+              : 'User ID not found';
           _loading = false;
         });
         return;
@@ -97,7 +99,9 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
       
       if (patientRecord == null || patientRecord['id'] == null) {
         setState(() {
-          _error = 'Patient record not found';
+          _error = Localizations.localeOf(context).languageCode == 'ar'
+              ? 'لم يتم العثور على بيانات المريض'
+              : 'Patient record not found';
           _loading = false;
         });
         return;
@@ -147,7 +151,9 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load activities: $e';
+        final isAr = Localizations.localeOf(context).languageCode == 'ar';
+        _error =
+            isAr ? 'فشل تحميل الأنشطة: $e' : 'Failed to load activities: $e';
         _loading = false;
       });
     }
@@ -192,6 +198,8 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     final media = MediaQuery.of(context);
     final width = media.size.width;
     final isSmall = width < 360;
@@ -231,7 +239,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                     width: isSmall ? double.infinity : 160,
                     child: ElevatedButton(
                       onPressed: _loadActivities,
-                      child: const Text('Retry'),
+                      child: Text(isAr ? 'إعادة المحاولة' : 'Retry'),
                     ),
                   ),
                 ],
@@ -276,7 +284,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Memory Activities',
+                              isAr ? 'أنشطة الذاكرة' : 'Memory Activities',
                               style: TextStyle(
                                 fontSize: titleSize,
                                 fontWeight: FontWeight.bold,
@@ -285,7 +293,9 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Keep your mind active and engaged',
+                              isAr
+                                  ? 'حافظ على نشاط ذاكرتك وتركيزك'
+                                  : 'Keep your mind active and engaged',
                               style: TextStyle(
                                 fontSize: subtitleSize,
                                 color: kGray600,
@@ -301,7 +311,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                           IconButton(
                             icon: const Icon(Icons.refresh),
                             onPressed: _loadActivities,
-                            tooltip: 'Refresh',
+                            tooltip: isAr ? 'تحديث' : 'Refresh',
                           ),
                           SizedBox(
                             width: constraints.maxWidth < 360 ? 40 : 48,
@@ -333,8 +343,8 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const TabBar(
-                      indicator: BoxDecoration(
+                    child: TabBar(
+                      indicator: const BoxDecoration(
                         gradient: kTealGradient,
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
@@ -342,8 +352,8 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                       labelColor: Colors.white,
                       unselectedLabelColor: kGray600,
                       tabs: [
-                        Tab(text: 'Today'),
-                        Tab(text: 'Schedule'),
+                        Tab(text: isAr ? 'اليوم' : 'Today'),
+                        Tab(text: isAr ? 'الجدول' : 'Schedule'),
                       ],
                     ),
                   ),
@@ -526,9 +536,14 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
 
   Widget _buildPatientList(List<Map<String, dynamic>> list) {
     if (list.isEmpty) {
-      return const Center(
-          child:
-              Text('No activities found.', style: TextStyle(color: kGray600)));
+      return Center(
+        child: Text(
+          Localizations.localeOf(context).languageCode == 'ar'
+              ? 'لا توجد أنشطة.'
+              : 'No activities found.',
+          style: const TextStyle(color: kGray600),
+        ),
+      );
     }
     return ListView.builder(
       itemCount: list.length,
@@ -616,16 +631,20 @@ class _ProgressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
           gradient: kTealGradient, borderRadius: BorderRadius.circular(16)),
       child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-            Text('Today\'s Progress',
-                style: TextStyle(color: Color(0xFFCFFAFE), fontSize: 14)),
-            SizedBox(height: 4),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              isAr ? 'تقدّم اليوم' : 'Today\'s Progress',
+              style: const TextStyle(color: Color(0xFFCFFAFE), fontSize: 14),
+            ),
+            const SizedBox(height: 4),
           ]),
           Container(
             width: 64,
@@ -637,7 +656,10 @@ class _ProgressCard extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 8),
-        Text('$done/$total Activities',
+        Text(
+            isAr
+                ? '$done من $total نشاط'
+                : '$done/$total Activities',
             style: const TextStyle(
                 color: Colors.white,
                 fontSize: 24,
@@ -653,8 +675,10 @@ class _ProgressCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        const Text('Great job! Keep going! 💪',
-            style: TextStyle(color: Color(0xFFCFFAFE), fontSize: 14)),
+        Text(
+          isAr ? 'ممتاز! استمر 💪' : 'Great job! Keep going! 💪',
+          style: const TextStyle(color: Color(0xFFCFFAFE), fontSize: 14),
+        ),
       ]),
     );
   }

@@ -227,6 +227,7 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final media = MediaQuery.of(context);
     final width = media.size.width;
     final isSmall = width < 360;
@@ -257,7 +258,7 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Error: $_error',
+                    isAr ? 'خطأ: $_error' : 'Error: $_error',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -265,7 +266,7 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                     width: isSmall ? double.infinity : 160,
                     child: ElevatedButton(
                       onPressed: _loadData,
-                      child: const Text('Retry'),
+                      child: Text(isAr ? 'إعادة المحاولة' : 'Retry'),
                     ),
                   ),
                 ],
@@ -310,7 +311,7 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Memory Activities',
+                              isAr ? 'أنشطة الذاكرة' : 'Memory Activities',
                               style: TextStyle(
                                 fontSize: titleSize,
                                 fontWeight: FontWeight.bold,
@@ -319,7 +320,9 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Keep your mind active and engaged',
+                              isAr
+                                  ? 'حافظ على نشاط ذاكرتك وتركيزك'
+                                  : 'Keep your mind active and engaged',
                               style: TextStyle(
                                 fontSize: subtitleSize,
                                 color: kGray600,
@@ -359,8 +362,8 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const TabBar(
-                      indicator: BoxDecoration(
+                    child: TabBar(
+                      indicator: const BoxDecoration(
                         gradient: kTealGradient,
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
@@ -368,8 +371,8 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                       labelColor: Colors.white,
                       unselectedLabelColor: kGray600,
                       tabs: [
-                        Tab(text: 'Today'),
-                        Tab(text: 'Schedule'),
+                        Tab(text: isAr ? 'اليوم' : 'Today'),
+                        Tab(text: isAr ? 'الجدول' : 'Schedule'),
                       ],
                     ),
                   ),
@@ -552,9 +555,14 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
 
   Widget _buildFamilyList(List<Map<String, dynamic>> list) {
     if (list.isEmpty) {
-      return const Center(
-          child:
-              Text('No activities found.', style: TextStyle(color: kGray600)));
+      return Center(
+        child: Text(
+          Localizations.localeOf(context).languageCode == 'ar'
+              ? 'لا توجد أنشطة.'
+              : 'No activities found.',
+          style: const TextStyle(color: kGray600),
+        ),
+      );
     }
     return ListView.builder(
       itemCount: list.length,
@@ -658,16 +666,21 @@ class _ProgressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
           gradient: kTealGradient, borderRadius: BorderRadius.circular(16)),
       child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-            Text('Today\'s Progress',
-                style: TextStyle(color: Color(0xFFCFFAFE), fontSize: 14)),
-            SizedBox(height: 4),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              isAr ? 'تقدّم اليوم' : 'Today\'s Progress',
+              style:
+                  const TextStyle(color: Color(0xFFCFFAFE), fontSize: 14),
+            ),
+            const SizedBox(height: 4),
           ]),
           Container(
             width: 64,
@@ -695,8 +708,10 @@ class _ProgressCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        const Text('Great job! Keep going! 💪',
-            style: TextStyle(color: Color(0xFFCFFAFE), fontSize: 14)),
+        Text(
+          isAr ? 'ممتاز! استمر 💪' : 'Great job! Keep going! 💪',
+          style: const TextStyle(color: Color(0xFFCFFAFE), fontSize: 14),
+        ),
       ]),
     );
   }

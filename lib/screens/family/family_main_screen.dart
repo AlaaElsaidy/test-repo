@@ -126,6 +126,8 @@ class _FamilyMainScreenState extends State<FamilyMainScreen> {
   @override
   Widget build(BuildContext context) {
     final textScale = MediaQuery.of(context).textScaleFactor.clamp(0.8, 1.2);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
 
     return NotificationListenerWidget(
       showSnackBar: true,
@@ -136,8 +138,8 @@ class _FamilyMainScreenState extends State<FamilyMainScreen> {
       },
       child: Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.lightGradient,
+        decoration: BoxDecoration(
+          gradient: isDark ? AppTheme.darkGradient : AppTheme.lightGradient,
         ),
         child: _screens[_currentIndex],
       ),
@@ -157,11 +159,16 @@ class _FamilyMainScreenState extends State<FamilyMainScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.home, 'Home', textScale),
-                _buildNavItem(1, Icons.location_on, 'Tracking', textScale),
-                _buildNavItem(4, Icons.psychology, 'Activities', textScale),
-                _buildNavItem(2, Icons.chat, 'Chat', textScale),
-                _buildNavItem(3, Icons.person, 'Profile', textScale),
+                _buildNavItem(
+                    0, Icons.home, isAr ? 'الرئيسية' : 'Home', textScale),
+                _buildNavItem(
+                    1, Icons.location_on, isAr ? 'التتبع' : 'Tracking', textScale),
+                _buildNavItem(4, Icons.psychology,
+                    isAr ? 'الأنشطة' : 'Activities', textScale),
+                _buildNavItem(
+                    2, Icons.chat, isAr ? 'المحادثة' : 'Chat', textScale),
+                _buildNavItem(
+                    3, Icons.person, isAr ? 'الملف' : 'Profile', textScale),
               ],
             ),
           ),

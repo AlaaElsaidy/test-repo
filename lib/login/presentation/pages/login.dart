@@ -18,6 +18,7 @@ import '../../../config/shared/widgets/loading.dart';
 import '../../../config/utilis/app_colors.dart';
 import '../../../screens/family/signup/data/userModel.dart';
 import '../widgets/sign-up-link.dart';
+import '../../../main.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -53,6 +54,7 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
 
     return BlocProvider(
       create: (context) => LoginCubit(LoginRepo(AuthService(), UserService())),
@@ -82,6 +84,17 @@ class _SignInScreenState extends State<SignInScreen> {
             }
             if (state is GetUserSuccess) {
               var user = UserModel.fromJson(state.user!);
+
+              // Apply user-specific theme & language immediately after login
+              final appState =
+                  context.findAncestorStateOfType<MyAppState>();
+              final role = user.role;
+              final userId = state.user!['id'] as String;
+              if (appState != null) {
+                // مش مهم نستنى النتيجة هنا، بس لو حابة تقدرى تخليها await
+                appState.loadUserSettings(role: role, userId: userId);
+              }
+
               if (user.role == "patient") {
                 await SharedPrefsHelper.saveString(
                     "patientUid", state.user!['id']);
@@ -157,7 +170,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           children: [
                             SizedBox(height: context.h(16)),
                             Text(
-                              'Welcome Back!',
+                              isAr ? 'مرحباً بعودتك!' : 'Welcome Back!',
                               style: TextStyle(
                                 color: const Color(0xFF0E3E3B),
                                 fontWeight: FontWeight.w800,
@@ -166,7 +179,9 @@ class _SignInScreenState extends State<SignInScreen> {
                             ),
                             SizedBox(height: context.h(6)),
                             Text(
-                              'Sign in with your email',
+                              isAr
+                                  ? 'سجّل الدخول باستخدام البريد الإلكترونى'
+                                  : 'Sign in with your email',
                               style: TextStyle(
                                 color: const Color(0xFF7EA9A3),
                                 fontWeight: FontWeight.w600,
@@ -210,7 +225,9 @@ class _SignInScreenState extends State<SignInScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Account Information',
+                                        isAr
+                                            ? 'بيانات الحساب'
+                                            : 'Account Information',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: context.sp(18),
@@ -222,7 +239,9 @@ class _SignInScreenState extends State<SignInScreen> {
 
                                       // Email
                                       Text(
-                                        'Email Address',
+                                        isAr
+                                            ? 'البريد الإلكترونى'
+                                            : 'Email Address',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -238,7 +257,9 @@ class _SignInScreenState extends State<SignInScreen> {
                                           textEditingController:
                                               _emailController,
                                           validator: (v) => emailValidator(v),
-                                          hintText: "example@mail.com",
+                                          hintText: isAr
+                                              ? "example@mail.com"
+                                              : "example@mail.com",
                                           textInputType:
                                               TextInputType.emailAddress,
                                         ),
@@ -248,7 +269,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                                       // Password
                                       Text(
-                                        'Password',
+                                        isAr ? 'كلمة المرور' : 'Password',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -294,7 +315,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                           ),
                                           const SizedBox(width: 4),
                                           Text(
-                                            'Remember me',
+                                            isAr ? 'تذكرنى' : 'Remember me',
                                             style: TextStyle(
                                               color: const Color(0xFF2E5753),
                                               fontSize: context.sp(14),
@@ -313,7 +334,9 @@ class _SignInScreenState extends State<SignInScreen> {
                                                       .shrinkWrap,
                                             ),
                                             child: Text(
-                                              'Forgot password?',
+                                              isAr
+                                                  ? 'هل نسيت كلمة المرور؟'
+                                                  : 'Forgot password?',
                                               style: TextStyle(
                                                 color: AppColors.primaryColor,
                                                 fontWeight: FontWeight.w700,
@@ -345,8 +368,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                           },
                                           text: state is GetUserLoading ||
                                                   state is LoginLoading
-                                              ? "Loading..."
-                                              : "Login",
+                                              ? (isAr ? "جارى التحميل..." : "Loading...")
+                                              : (isAr ? "تسجيل الدخول" : "Login"),
                                         ),
                                       ),
                                     ],

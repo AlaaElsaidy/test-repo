@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../theme/app_theme.dart';
+import '../../main.dart';
 
 class PatientProfileScreen extends StatefulWidget {
   // Patient is optional: if you still call const PatientProfileScreen(), it uses default demo data.
@@ -478,6 +479,9 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final p = _patient;
+    final appState = context.findAncestorStateOfType<MyAppState>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final localeCode = Localizations.localeOf(context).languageCode;
 
     if (_loading) {
       return Directionality(
@@ -530,7 +534,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             key: _formKey,
             child: Column(
               children: [
-                // Header (smaller, no age)
+                // Header (smaller, no age) + theme & language for this patient
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -539,6 +543,51 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                   ),
                   child: Column(
                     children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () {
+                                if (appState == null || _patientUserId == null) {
+                                  return;
+                                }
+                                final newLocale = localeCode == 'ar'
+                                    ? const Locale('en')
+                                    : const Locale('ar');
+                                appState.setLocale(
+                                  newLocale,
+                                  role: 'patient',
+                                  userId: _patientUserId!,
+                                );
+                              },
+                              icon: const Icon(Icons.language),
+                              label: Text(localeCode == 'ar' ? 'English' : 'عربي'),
+                            ),
+                            IconButton(
+                              tooltip: isDark ? 'Light mode' : 'Dark mode',
+                              onPressed: () {
+                                if (appState == null || _patientUserId == null) {
+                                  return;
+                                }
+                                appState.setThemeMode(
+                                  isDark ? ThemeMode.light : ThemeMode.dark,
+                                  role: 'patient',
+                                  userId: _patientUserId!,
+                                );
+                              },
+                              icon: Icon(
+                                isDark ? Icons.light_mode : Icons.dark_mode,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       Stack(
                         clipBehavior: Clip.none,
                         children: [

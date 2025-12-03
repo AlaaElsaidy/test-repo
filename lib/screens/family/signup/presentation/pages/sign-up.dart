@@ -46,6 +46,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -105,7 +106,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           children: [
                             SizedBox(height: context.h(16)),
                             Text(
-                              'Create Account',
+                              isAr ? 'إنشاء حساب' : 'Create Account',
                               style: TextStyle(
                                 color: const Color(0xFF0E3E3B),
                                 fontWeight: FontWeight.w800,
@@ -114,7 +115,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             ),
                             SizedBox(height: context.h(6)),
                             Text(
-                              'Sign up with your email',
+                              isAr
+                                  ? 'سجّل بحساب البريد الإلكترونى'
+                                  : 'Sign up with your email',
                               style: TextStyle(
                                 color: const Color(0xFF7EA9A3),
                                 fontWeight: FontWeight.w600,
@@ -156,7 +159,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Account Information',
+                                        isAr
+                                            ? 'بيانات الحساب'
+                                            : 'Account Information',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: context.sp(18),
@@ -168,7 +173,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                                       // Full Name
                                       Text(
-                                        'Full Name',
+                                        isAr ? 'الاسم بالكامل' : 'Full Name',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -182,7 +187,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                           textEditingController:
                                               _nameController,
                                           validator: (v) => nameValidator(v),
-                                          hintText: "Enter your name",
+                                          hintText: isAr
+                                              ? "اكتب اسمك"
+                                              : "Enter your name",
                                           textInputType: TextInputType.name,
                                         ),
                                       ),
@@ -190,7 +197,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       SizedBox(height: context.h(16)),
 
                                       Text(
-                                        'Email Address',
+                                        isAr
+                                            ? 'البريد الإلكترونى'
+                                            : 'Email Address',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -205,7 +214,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                           textEditingController:
                                               _emailController,
                                           validator: (v) => emailValidator(v),
-                                          hintText: "example@mail.com",
+                                          hintText: isAr
+                                              ? "example@mail.com"
+                                              : "example@mail.com",
                                           textInputType:
                                               TextInputType.emailAddress,
                                         ),
@@ -214,7 +225,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       SizedBox(height: context.h(16)),
 
                                       Text(
-                                        'Password',
+                                        isAr ? 'كلمة المرور' : 'Password',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -229,7 +240,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                               _passwordController,
                                           validator: (v) =>
                                               passwordValidator(v),
-                                          hintText: "Enter your password",
+                                          hintText: isAr
+                                              ? "أدخل كلمة المرور"
+                                              : "Enter your password",
                                           textInputType: TextInputType.text,
                                           secure: true,
                                         ),
@@ -238,7 +251,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       SizedBox(height: context.h(16)),
 
                                       Text(
-                                        'Confirm Password',
+                                        isAr
+                                            ? 'تأكيد كلمة المرور'
+                                            : 'Confirm Password',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -256,7 +271,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                             v,
                                             _passwordController.text,
                                           ),
-                                          hintText: "Re-enter your password",
+                                          hintText: isAr
+                                              ? "أعد إدخال كلمة المرور"
+                                              : "Re-enter your password",
                                           textInputType: TextInputType.text,
                                           secure: true,
                                         ),
@@ -282,8 +299,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                           },
                                           text: state is SignUpLoading ||
                                                   state is AddFamilyLoading
-                                              ? "Loading..."
-                                              : "Signup",
+                                              ? (isAr
+                                                  ? "جارى التحميل..."
+                                                  : "Loading...")
+                                              : (isAr ? "تسجيل" : "Signup"),
                                         ),
                                       ),
                                     ],

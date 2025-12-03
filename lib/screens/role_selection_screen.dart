@@ -8,10 +8,13 @@ class RoleSelectionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.lightGradient,
+        decoration: BoxDecoration(
+          gradient: isDark ? AppTheme.darkGradient : AppTheme.lightGradient,
         ),
         child: SafeArea(
           child: Center(
@@ -37,19 +40,21 @@ class RoleSelectionScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Title
-                  const Text(
+                  Text(
                     'Memora',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.teal900,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Compassionate Care for Alzheimer\'s Patients',
+                  Text(
+                    isAr
+                        ? 'رعاية رحيمة لمرضى الزهايمر'
+                        : 'Compassionate Care for Alzheimer\'s Patients',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                       color: AppTheme.teal600,
                     ),
@@ -73,9 +78,9 @@ class RoleSelectionScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        const Text(
-                          'Select Your Role',
-                          style: TextStyle(
+                        Text(
+                          isAr ? 'اختر دورك' : 'Select Your Role',
+                          style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.teal900,
@@ -86,7 +91,7 @@ class RoleSelectionScreen extends StatelessWidget {
                         // Patient Button
                         _RoleButton(
                           icon: Icons.person,
-                          label: 'Patient Portal',
+                          label: isAr ? 'بوابة المريض' : 'Patient Portal',
                           onPressed: () {
                             SharedPrefsHelper.saveString('selectedRole', 'patient');
                             Navigator.pushNamed(context, AppRoutes.login);
@@ -97,7 +102,7 @@ class RoleSelectionScreen extends StatelessWidget {
                         // Doctor Button
                         _RoleButton(
                           icon: Icons.medical_services,
-                          label: 'Doctor Portal',
+                          label: isAr ? 'بوابة الطبيب' : 'Doctor Portal',
                           onPressed: () {
                             SharedPrefsHelper.saveString('selectedRole', 'doctor');
                             Navigator.pushNamed(context, AppRoutes.login);
@@ -108,7 +113,8 @@ class RoleSelectionScreen extends StatelessWidget {
                         // Family Button
                         _RoleButton(
                           icon: Icons.family_restroom,
-                          label: 'Family Member Portal',
+                          label:
+                              isAr ? 'بوابة أفراد العائلة' : 'Family Member Portal',
                           onPressed: () {
                             SharedPrefsHelper.saveString('selectedRole', 'family');
                             Navigator.pushNamed(context, AppRoutes.login);

@@ -147,6 +147,7 @@ class _FamilyChatScreenState extends State<FamilyChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final statusDotColor = widget.isOnline ? Colors.green : Colors.grey;
 
     return Scaffold(
@@ -193,7 +194,9 @@ class _FamilyChatScreenState extends State<FamilyChatScreen> {
                   ),
                 ),
                 Text(
-                  widget.isOnline ? 'Online' : 'Offline',
+                  widget.isOnline
+                      ? (isAr ? 'متصل' : 'Online')
+                      : (isAr ? 'غير متصل' : 'Offline'),
                   style: TextStyle(
                     fontSize: 12,
                     color: widget.isOnline ? Colors.green : Colors.grey,
@@ -325,11 +328,14 @@ class _FamilyChatScreenState extends State<FamilyChatScreen> {
                           Expanded(
                             child: TextField(
                               controller: _messageController,
-                              decoration: const InputDecoration(
-                                  hintText: 'Type a message...',
-                                  border: InputBorder.none,
-                                  contentPadding:
-                                      EdgeInsets.symmetric(vertical: 12)),
+                                  decoration: InputDecoration(
+                                      hintText: isAr
+                                          ? 'اكتب رسالة...'
+                                          : 'Type a message...',
+                                      border: InputBorder.none,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              vertical: 12)),
                               onChanged: (_) => setState(() {}),
                             ),
                           ),

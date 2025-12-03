@@ -130,11 +130,13 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
   @override
   Widget build(BuildContext context) {
     final textScale = MediaQuery.of(context).textScaleFactor.clamp(0.8, 1.2);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.lightGradient,
+        decoration: BoxDecoration(
+          gradient: isDark ? AppTheme.darkGradient : AppTheme.lightGradient,
         ),
         child: _screens[_currentIndex],
       ),
@@ -159,7 +161,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
                     context,
                     0,
                     Icons.dashboard,
-                    'Dashboard',
+                    isAr ? 'اللوحة' : 'Dashboard',
                     textScale,
                   ),
                 ),
@@ -168,7 +170,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
                     context,
                     1,
                     Icons.article,
-                    'Advice',
+                    isAr ? 'نصائح' : 'Advice',
                     textScale,
                   ),
                 ),
@@ -177,7 +179,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
                     context,
                     2,
                     Icons.chat,
-                    'Chat',
+                    isAr ? 'المحادثات' : 'Chat',
                     textScale,
                   ),
                 ),
@@ -186,7 +188,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
                     context,
                     3,
                     Icons.person,
-                    'Profile',
+                    isAr ? 'الملف' : 'Profile',
                     textScale,
                   ),
                 ),

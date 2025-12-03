@@ -322,10 +322,21 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
 
   String _timeAgo(DateTime t) {
     final d = DateTime.now().difference(t);
-    if (d.inMinutes < 1) return 'Just now';
-    if (d.inMinutes < 60) return '${d.inMinutes} min${d.inMinutes > 1 ? 's' : ''} ago';
-    if (d.inHours < 24) return '${d.inHours} hour${d.inHours > 1 ? 's' : ''} ago';
-    return '${d.inDays} day${d.inDays > 1 ? 's' : ''} ago';
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    if (d.inMinutes < 1) return isAr ? 'الآن' : 'Just now';
+    if (d.inMinutes < 60) {
+      return isAr
+          ? '${d.inMinutes} دقيقة مضت'
+          : '${d.inMinutes} min${d.inMinutes > 1 ? 's' : ''} ago';
+    }
+    if (d.inHours < 24) {
+      return isAr
+          ? '${d.inHours} ساعة مضت'
+          : '${d.inHours} hour${d.inHours > 1 ? 's' : ''} ago';
+    }
+    return isAr
+        ? '${d.inDays} يوم مضى'
+        : '${d.inDays} day${d.inDays > 1 ? 's' : ''} ago';
   }
 
   Future<void> _refreshLocation() async {
@@ -673,6 +684,8 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return SafeArea(
       child: Column(
         children: [
@@ -692,16 +705,16 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Live Tracking',
-                            style: TextStyle(
+                          Text(
+                            isAr ? 'تتبع لحظى' : 'Live Tracking',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            _patientName ?? 'Select Patient',
+                            _patientName ?? (isAr ? 'اختر المريض' : 'Select Patient'),
                             style: const TextStyle(
                               color: Color(0xFFCFFAFE),
                               fontSize: 14,
@@ -733,7 +746,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                     children: [
                       Expanded(
                         child: _TabButton(
-                          label: 'Live',
+                          label: isAr ? 'حى' : 'Live',
                           icon: Icons.location_on,
                           isSelected: _selectedTab == 0,
                           onTap: () => setState(() => _selectedTab = 0),
@@ -741,7 +754,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                       ),
                       Expanded(
                         child: _TabButton(
-                          label: 'Safe Zones',
+                          label: isAr ? 'المناطق الآمنة' : 'Safe Zones',
                           icon: Icons.shield,
                           isSelected: _selectedTab == 1,
                           onTap: () => setState(() => _selectedTab = 1),
@@ -749,7 +762,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                       ),
                       Expanded(
                         child: _TabButton(
-                          label: 'History',
+                          label: isAr ? 'السجل' : 'History',
                           icon: Icons.history,
                           isSelected: _selectedTab == 2,
                           onTap: () => setState(() => _selectedTab = 2),
@@ -769,13 +782,15 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                     ? Center(
                         child: _loadingLocation
                             ? const CircularProgressIndicator()
-                            : const Text('No location data available'),
+                            : Text(isAr
+                                ? 'لا توجد بيانات للموقع'
+                                : 'No location data available'),
                       )
                     : _LiveTrackingView(
                         isInsideAny: _isInsideAnyActiveZone,
                         statusText: _isInsideAnyActiveZone
-                            ? 'Safe Zone'
-                            : 'Outside Zone',
+                            ? (isAr ? 'منطقة آمنة' : 'Safe Zone')
+                            : (isAr ? 'خارج المنطقة الآمنة' : 'Outside Zone'),
                         statusColor: _isInsideAnyActiveZone
                             ? Colors.green
                             : Colors.red,
@@ -783,7 +798,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                             '${_patient!.lat.toStringAsFixed(6)}, ${_patient!.lng.toStringAsFixed(6)}',
                         lastUpdatedLabel: _lastUpdated != null
                             ? _timeAgo(_lastUpdated!)
-                            : 'Unknown',
+                            : (isAr ? 'غير معروف' : 'Unknown'),
                         onRefresh: _refreshLocation,
                         onDirections: () => _openMapsTo(
                           lat: _patient!.lat,
@@ -886,8 +901,12 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                     : _loadingHistory
                         ? const Center(child: CircularProgressIndicator())
                         : _history.isEmpty
-                            ? const Center(
-                                child: Text('No location history available'),
+                            ? Center(
+                                child: Text(
+                                  isAr
+                                      ? 'لا يوجد سجل للموقع'
+                                      : 'No location history available',
+                                ),
                               )
                             : _HistoryView(
                                 entries: _history.map((h) {
@@ -1249,13 +1268,19 @@ class _SafeZonesEditorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return Container(
-      decoration: const BoxDecoration(gradient: AppTheme.lightGradient),
+      decoration: BoxDecoration(
+        gradient: Theme.of(context).brightness == Brightness.dark
+            ? AppTheme.darkGradient
+            : AppTheme.lightGradient,
+      ),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            'Safe Zones • $patientName',
+            isAr ? 'المناطق الآمنة • $patientName' : 'Safe Zones • $patientName',
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -1264,12 +1289,14 @@ class _SafeZonesEditorView extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (zones.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32.0),
+            Padding(
+              padding: const EdgeInsets.all(32.0),
               child: Center(
                 child: Text(
-                  'No safe zones yet. Add one to get started.',
-                  style: TextStyle(color: AppTheme.gray500),
+                  isAr
+                      ? 'لا توجد مناطق آمنة بعد، أضف واحدة للبدء.'
+                      : 'No safe zones yet. Add one to get started.',
+                  style: const TextStyle(color: AppTheme.gray500),
                 ),
               ),
             )
@@ -1296,7 +1323,9 @@ class _SafeZonesEditorView extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: onAddPressed,
               icon: const Icon(Icons.add),
-              label: const Text('Add New Safe Zone'),
+              label: Text(
+                isAr ? 'إضافة منطقة آمنة جديدة' : 'Add New Safe Zone',
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.teal500,
                 foregroundColor: Colors.white,
@@ -1322,23 +1351,29 @@ class _HistoryView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return Container(
-      decoration: const BoxDecoration(gradient: AppTheme.lightGradient),
+      decoration: BoxDecoration(
+        gradient: Theme.of(context).brightness == Brightness.dark
+            ? AppTheme.darkGradient
+            : AppTheme.lightGradient,
+      ),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Location History',
-            style: TextStyle(
+          Text(
+            isAr ? 'سجل المواقع' : 'Location History',
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: AppTheme.teal900,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Places visited recently',
-            style: TextStyle(
+          Text(
+            isAr ? 'الأماكن التى زارها المريض مؤخراً' : 'Places visited recently',
+            style: const TextStyle(
               fontSize: 14,
               color: AppTheme.gray600,
             ),

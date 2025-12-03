@@ -9,6 +9,7 @@ import '../../core/supabase/auth-service.dart';
 import '../../core/supabase/supabase-config.dart';
 import '../../core/supabase/supabase-service.dart';
 import '../../theme/app_theme.dart';
+import '../../main.dart';
 
 class DoctorProfileScreen extends StatefulWidget {
   const DoctorProfileScreen({super.key});
@@ -179,9 +180,11 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Edit Profile',
-                style: TextStyle(
+              Text(
+                Localizations.localeOf(ctx).languageCode == 'ar'
+                    ? 'تعديل الملف الشخصى'
+                    : 'Edit Profile',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.teal900,
@@ -190,38 +193,51 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Full name',
-                  prefixIcon: Icon(Icons.person),
+                decoration: InputDecoration(
+                  labelText: Localizations.localeOf(ctx).languageCode == 'ar'
+                      ? 'الاسم بالكامل'
+                      : 'Full name',
+                  prefixIcon: const Icon(Icons.person),
                 ),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Name is required' : null,
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? (Localizations.localeOf(ctx).languageCode == 'ar'
+                        ? 'الاسم مطلوب'
+                        : 'Name is required')
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: phoneCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Phone number',
-                  prefixIcon: Icon(Icons.phone),
+                decoration: InputDecoration(
+                  labelText: Localizations.localeOf(ctx).languageCode == 'ar'
+                      ? 'رقم الهاتف'
+                      : 'Phone number',
+                  prefixIcon: const Icon(Icons.phone),
                 ),
                 keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: emailCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Email address',
-                  prefixIcon: Icon(Icons.email),
+                decoration: InputDecoration(
+                  labelText: Localizations.localeOf(ctx).languageCode == 'ar'
+                      ? 'البريد الإلكترونى'
+                      : 'Email address',
+                  prefixIcon: const Icon(Icons.email),
                 ),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Email is required';
+                    return Localizations.localeOf(ctx).languageCode == 'ar'
+                        ? 'البريد الإلكترونى مطلوب'
+                        : 'Email is required';
                   }
                   final regex = RegExp(
                       r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
                   if (!regex.hasMatch(value.trim())) {
-                    return 'Enter a valid email';
+                    return Localizations.localeOf(ctx).languageCode == 'ar'
+                        ? 'أدخل بريد إلكترونى صحيح'
+                        : 'Enter a valid email';
                   }
                   return null;
                 },
@@ -251,7 +267,11 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                       _showSnack('Failed to update: $e');
                     }
                   },
-                  child: const Text('Save Changes'),
+                  child: Text(
+                    Localizations.localeOf(ctx).languageCode == 'ar'
+                        ? 'حفظ التغييرات'
+                        : 'Save Changes',
+                  ),
                 ),
               ),
             ],
@@ -276,6 +296,8 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return SafeArea(
       child: FutureBuilder<_DoctorProfileData?>(
         future: _profileFuture,
@@ -290,7 +312,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 children: [
                   const Icon(Icons.error_outline, size: 48, color: Colors.red),
                   const SizedBox(height: 8),
-                  const Text('Failed to load profile'),
+                  Text(isAr ? 'فشل تحميل الملف الشخصى' : 'Failed to load profile'),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
                     onPressed: () {
@@ -299,7 +321,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                       });
                     },
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
+                    label: Text(isAr ? 'إعادة المحاولة' : 'Retry'),
                   ),
                 ],
               ),
@@ -307,6 +329,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           }
 
           final data = snapshot.data!;
+          final appState = context.findAncestorStateOfType<MyAppState>();
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final localeCode = Localizations.localeOf(context).languageCode;
 
           final avatarImage = _buildAvatarImage(data);
 
@@ -314,7 +339,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Profile Header
+                // Profile Header + Settings (theme & language for this doctor)
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -323,6 +348,47 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                   ),
                   child: Column(
                     children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () {
+                                if (appState == null) return;
+                                final newLocale = localeCode == 'ar'
+                                    ? const Locale('en')
+                                    : const Locale('ar');
+                                appState.setLocale(
+                                  newLocale,
+                                  role: 'doctor',
+                                  userId: data.doctorId,
+                                );
+                              },
+                              icon: const Icon(Icons.language),
+                              label: Text(localeCode == 'ar' ? 'English' : 'عربي'),
+                            ),
+                            IconButton(
+                              tooltip: isDark ? 'Light mode' : 'Dark mode',
+                              onPressed: () {
+                                if (appState == null) return;
+                                appState.setThemeMode(
+                                  isDark ? ThemeMode.light : ThemeMode.dark,
+                                  role: 'doctor',
+                                  userId: data.doctorId,
+                                );
+                              },
+                              icon: Icon(
+                                isDark ? Icons.light_mode : Icons.dark_mode,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       Stack(
                         clipBehavior: Clip.none,
                         children: [
@@ -404,7 +470,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          data.experienceLabel,
+                          data.getExperienceLabel(context),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -434,10 +500,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                'Active Patients',
+                              Text(
+                                isAr ? 'المرضى النشطون' : 'Active Patients',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 12,
                                   color: AppTheme.gray600,
                                 ),
@@ -463,10 +529,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                'Total Cases',
+                              Text(
+                                isAr ? 'إجمالى الحالات' : 'Total Cases',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 12,
                                   color: AppTheme.gray600,
                                 ),
@@ -490,9 +556,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Contact Information',
-                              style: TextStyle(
+                            Text(
+                              isAr ? 'معلومات الاتصال' : 'Contact Information',
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.teal900,
@@ -500,22 +566,22 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                             ),
                             TextButton(
                               onPressed: () => _openEditContactSheet(data),
-                              child: const Text('Edit'),
+                              child: Text(isAr ? 'تعديل' : 'Edit'),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
                         _InfoRow(
                           icon: Icons.phone,
-                          label: 'Phone',
-                          value: data.phone ?? 'Add phone number',
+                          label: isAr ? 'الهاتف' : 'Phone',
+                          value: data.phone ?? (isAr ? 'أضف رقم هاتف' : 'Add phone number'),
                           color: AppTheme.teal500,
                         ),
                         const SizedBox(height: 12),
                         _InfoRow(
                           icon: Icons.email,
-                          label: 'Email',
-                          value: data.email ?? 'Add email',
+                          label: isAr ? 'البريد الإلكترونى' : 'Email',
+                          value: data.email ?? (isAr ? 'أضف بريد إلكترونى' : 'Add email'),
                           color: AppTheme.cyan500,
                         ),
                       ],
@@ -531,9 +597,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                   child: ElevatedButton.icon(
                     onPressed: _handleLogout,
                     icon: const Icon(Icons.logout),
-                    label: const Text(
-                      'Logout',
-                      style: TextStyle(
+                    label: Text(
+                      isAr ? 'تسجيل الخروج' : 'Logout',
+                      style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -576,7 +642,10 @@ class _DoctorProfileData {
   String? get phone => user?['phone'] as String?;
   String? get specialty => user?['specialty'] as String?;
 
-  String get experienceLabel => 'Experience with Alzheimer\'s care';
+  String getExperienceLabel(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    return isAr ? 'خبرة فى رعاية مرضى الزهايمر' : 'Experience with Alzheimer\'s care';
+  }
 }
 
 class _InfoRow extends StatelessWidget {

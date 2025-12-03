@@ -147,6 +147,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final width = MediaQuery.of(context).size.width;
     final isNarrow = width < 360;
 
@@ -193,9 +194,9 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Welcome Back',
-                                  style: TextStyle(
+                                Text(
+                                  isAr ? 'مرحباً بعودتك' : 'Welcome Back',
+                                  style: const TextStyle(
                                     color: Color(0xFFCFFAFE),
                                     fontSize: 16,
                                   ),
@@ -226,7 +227,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                           width: isNarrow ? double.infinity : (width - 16 * 2 - 12) / 2,
                           child: StatCard(
                             icon: Icons.people,
-                            label: 'Active Patients',
+                            label: isAr ? 'المرضى النشطون' : 'Active Patients',
                             value: '$_activePatientsCount',
                             color: AppTheme.teal500,
                             backgroundColor: AppTheme.teal50,
@@ -236,7 +237,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                           width: isNarrow ? double.infinity : (width - 16 * 2 - 12) / 2,
                           child: StatCard(
                             icon: Icons.calendar_today,
-                            label: 'Appointments',
+                            label: isAr ? 'المواعيد' : 'Appointments',
                             value: '$_appointmentsCount',
                             color: AppTheme.cyan500,
                             backgroundColor: AppTheme.cyan50,
@@ -256,12 +257,12 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Expanded(
+                            Expanded(
                               child: Text(
-                                'Today\'s Appointments',
+                                isAr ? 'مواعيد اليوم' : 'Today\'s Appointments',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.teal900,
@@ -270,18 +271,20 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                             ),
                             TextButton(
                               onPressed: () {},
-                              child: const Text('View All'),
+                              child: Text(isAr ? 'عرض الكل' : 'View All'),
                             ),
                           ],
                             ),
                             const SizedBox(height: 16),
                             if (_todayAppointments.isEmpty)
-                              const Center(
+                              Center(
                                 child: Padding(
-                                  padding: EdgeInsets.all(16.0),
+                                  padding: const EdgeInsets.all(16.0),
                                   child: Text(
-                                    'No appointments today',
-                                    style: TextStyle(
+                                    isAr
+                                        ? 'لا توجد مواعيد اليوم'
+                                        : 'No appointments today',
+                                    style: const TextStyle(
                                       color: AppTheme.gray500,
                                     ),
                                   ),
@@ -351,6 +354,8 @@ class _AppointmentItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -387,7 +392,7 @@ class _AppointmentItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  type,
+                  isAr ? 'استشارة' : type,
                   style: const TextStyle(
                     fontSize: 14,
                     color: AppTheme.gray600,
@@ -421,7 +426,7 @@ class _AppointmentItem extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              status,
+              isAr ? 'قادمة' : status,
               style: TextStyle(
                 fontSize: 12,
                 color: statusColor,
