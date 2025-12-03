@@ -27,6 +27,20 @@ class PatientProfileScreen extends StatefulWidget {
               phone: '+1 (555) 123-4567',
               email: 'margaret.smith@email.com',
               address: '123 Oak Street, Springfield',
+              diseaseStage: 'mild',
+              medicalHistory: 'Hypertension, Type 2 Diabetes. Diagnosed with Alzheimer\'s in 2018.',
+              medications: [
+                Medication(
+                  name: 'Donepezil',
+                  dose: '10 mg',
+                  frequency: 'Once daily at night',
+                ),
+                Medication(
+                  name: 'Metformin',
+                  dose: '850 mg',
+                  frequency: 'Twice daily with meals',
+                ),
+              ],
               emergencyContact: EmergencyContact(
                 name: 'Emily Smith',
                 relation: 'Daughter',
@@ -69,6 +83,13 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
 
   FamilyContact? _familyContact;
 
+  // Optional medical fields (read-only for now)
+  String? _medicalHistory;
+  List<Medication> _medications = const [];
+  late final TextEditingController _ageCtrl;
+  late final TextEditingController _medicalHistoryCtrl;
+  List<_MedicationField> _medicationFields = [];
+
   bool get _isAr =>
       (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
 
@@ -88,9 +109,14 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     _phoneCtrl = TextEditingController(text: _patient.phone);
     _emailCtrl = TextEditingController(text: _patient.email);
     _addressCtrl = TextEditingController(text: _patient.address);
-    _emergencyPhoneCtrl = TextEditingController(
-      text: _patient.emergencyContact?.phone ?? '',
+    _emergencyPhoneCtrl =
+        TextEditingController(text: _patient.emergencyContact?.phone ?? '');
+    _ageCtrl = TextEditingController(
+      text: _patient.age > 0 ? _patient.age.toString() : '',
     );
+    _medicalHistoryCtrl =
+        TextEditingController(text: _patient.medicalHistory ?? '');
+    _rebuildMedicationFields(_patient.medications);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadProfileData();
@@ -104,6 +130,11 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     _emailCtrl.dispose();
     _addressCtrl.dispose();
     _emergencyPhoneCtrl.dispose();
+    _ageCtrl.dispose();
+    _medicalHistoryCtrl.dispose();
+    for (final f in _medicationFields) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -116,6 +147,21 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     _addressCtrl.text = _patient.address;
     _emergencyPhoneCtrl.text =
         _patient.emergencyContact?.phone ?? _familyContact?.phone ?? '';
+    _ageCtrl.text = _patient.age > 0 ? _patient.age.toString() : '';
+    _medicalHistoryCtrl.text = _patient.medicalHistory ?? '';
+    _rebuildMedicationFields(_patient.medications);
+  }
+
+  void _addMedicationField() {
+    setState(() {
+      _medicationFields.add(
+        _MedicationField(
+          name: TextEditingController(),
+          dose: TextEditingController(),
+          frequency: TextEditingController(),
+        ),
+      );
+    });
   }
 
   Future<void> _loadProfileData() async {
@@ -191,6 +237,23 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       final String? patientPhoto = (patientMap?['photo_url'] as String?);
       final String? patientName = (patientMap?['name'] as String?);
       final String? userName = (userMap?['name'] as String?);
+      final String? medicalHistory =
+          (patientMap?['medical_history'] as String?)?.trim();
+
+      // Optional medications list: expect a JSON array of objects
+      final List<Medication> medications = <Medication>[];
+      final medsRaw = patientMap?['medications'];
+      if (medsRaw is List) {
+        for (final m in medsRaw) {
+          if (m is Map<String, dynamic>) {
+            medications.add(Medication(
+              name: (m['name'] as String?) ?? '',
+              dose: (m['dose'] as String?) ?? '',
+              frequency: (m['frequency'] as String?) ?? '',
+            ));
+          }
+        }
+      }
 
       final updatedPatient = Patient(
         name: patientName ?? userName ?? _patient.name,
@@ -210,6 +273,11 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
               )
             : _patient.emergencyContact,
         avatarPath: patientPhoto ?? _patient.avatarPath,
+        diseaseStage: _patient.diseaseStage,
+        medicalHistory: medicalHistory?.isNotEmpty == true
+            ? medicalHistory
+            : _patient.medicalHistory,
+        medications: medications.isNotEmpty ? medications : _patient.medications,
       );
 
       if (!mounted) return;
@@ -217,6 +285,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         _patient = updatedPatient;
         _patientRowId = patientRowId ?? _patientRowId;
         _familyContact = familyContact;
+        _medicalHistory = updatedPatient.medicalHistory;
+        _medications = updatedPatient.medications;
         _nameCtrl.text = updatedPatient.name;
         _phoneCtrl.text = updatedPatient.phone;
         _emailCtrl.text = updatedPatient.email;
@@ -245,6 +315,43 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       ),
     );
   }
+
+  void _rebuildMedicationFields(List<Medication> meds) {
+    for (final f in _medicationFields) {
+      f.dispose();
+    }
+    _medicationFields = meds
+        .map(
+          (m) => _MedicationField(
+            name: TextEditingController(text: m.name),
+            dose: TextEditingController(text: m.dose),
+            frequency: TextEditingController(text: m.frequency),
+          ),
+        )
+        .toList();
+    if (_medicationFields.isEmpty) {
+      _medicationFields.add(
+        _MedicationField(
+          name: TextEditingController(),
+          dose: TextEditingController(),
+          frequency: TextEditingController(),
+        ),
+      );
+    }
+  }
+
+  List<Medication> _collectMedicationsFromFields() {
+    final List<Medication> meds = [];
+    for (final f in _medicationFields) {
+      final name = f.name.text.trim();
+      final dose = f.dose.text.trim();
+      final freq = f.frequency.text.trim();
+      if (name.isEmpty && dose.isEmpty && freq.isEmpty) continue;
+      meds.add(Medication(name: name, dose: dose, frequency: freq));
+    }
+    return meds;
+  }
+
 
   ImageProvider? _buildAvatarImage(Patient patient) {
     if (_avatarFile != null) return FileImage(_avatarFile!);
@@ -411,6 +518,9 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     final email = _emailCtrl.text.trim();
     final address = _addressCtrl.text.trim();
     final emergencyPhone = _emergencyPhoneCtrl.text.trim();
+    final rawAge = _ageCtrl.text.trim();
+    final medicalHistory = _medicalHistoryCtrl.text.trim();
+    final medications = _collectMedicationsFromFields();
     setState(() => _saving = true);
     try {
       // خزن رقم الطوارئ محلياً عشان صفحة التتبع تقدر تستخدمه فوراً
@@ -433,6 +543,16 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
           'home_address': address,
           'phone_emergency':
               emergencyPhone.isNotEmpty ? emergencyPhone : null,
+          if (rawAge.isNotEmpty) 'age': int.tryParse(rawAge),
+          // NOTE: مؤقتًا مش هنحدّث alzheimer_stage من شاشة المريض
+          'medical_history': medicalHistory.isNotEmpty ? medicalHistory : null,
+          'medications': medications
+              .map((m) => {
+                    'name': m.name,
+                    'dose': m.dose,
+                    'frequency': m.frequency,
+                  })
+              .toList(),
         }));
       }
 
@@ -443,6 +563,11 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         phone: phone,
         email: email,
         address: address,
+        age: int.tryParse(rawAge) ?? _patient.age,
+        diseaseStage: _patient.diseaseStage,
+        medicalHistory:
+            medicalHistory.isNotEmpty ? medicalHistory : _patient.medicalHistory,
+        medications: medications.isNotEmpty ? medications : _patient.medications,
         emergencyContact: emergencyPhone.isNotEmpty
             ? EmergencyContact(
                 name: _familyContact?.name ?? _patient.emergencyContact?.name ?? '',
@@ -464,6 +589,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       _showMessage(tr('Profile updated successfully ✅',
           'تم تحديث الملف الشخصي بنجاح ✅'));
     } catch (e) {
+      debugPrint('PatientProfile _save error: $e');
       _showMessage(
         tr('Failed to save changes', 'فشل حفظ التعديلات'),
         error: true,
@@ -603,11 +729,275 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                           color: Colors.white,
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Age
+                          if (p.age > 0)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.cake,
+                                    size: 16, color: Color(0xFFCFFAFE)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _isAr
+                                      ? '${p.age} سنة'
+                                      : '${p.age} years',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFFCFFAFE),
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
 
                 const SizedBox(height: 12),
+
+                // Medical overview card (age, stage, history)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tr('Medical Overview', 'الملف الطبي'),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.teal900,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_editing) ...[
+                          _buildTextField(
+                            controller: _ageCtrl,
+                            label: tr('Age (years)', 'العمر (بالسنوات)'),
+                            icon: Icons.cake,
+                            keyboardType: TextInputType.number,
+                          ),
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            controller: _medicalHistoryCtrl,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              labelText:
+                                  tr('Medical history', 'التاريخ الطبي'),
+                              prefixIcon: const Icon(
+                                Icons.medical_information,
+                                color: AppTheme.teal600,
+                              ),
+                              filled: true,
+                              fillColor: AppTheme.teal50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 12),
+                            ),
+                          ),
+                        ] else ...[
+                          _InfoRow(
+                            icon: Icons.cake,
+                            label: tr('Age', 'العمر'),
+                            value: p.age > 0
+                                ? (_isAr ? '${p.age} سنة' : '${p.age} years')
+                                : tr('Not specified', 'غير محدد'),
+                            color: AppTheme.teal500,
+                          ),
+                          if ((_medicalHistory ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.medical_information,
+                                  size: 18,
+                                  color: AppTheme.teal600,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  tr('Medical history', 'التاريخ الطبي'),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.gray600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _medicalHistory!,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.teal900,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Medications card
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tr('Current Medications', 'الأدوية الحالية'),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.teal900,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_editing) ...[
+                          Column(
+                            children: _medicationFields.map((f) {
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.only(bottom: 12),
+                                child: Column(
+                                  children: [
+                                    _buildTextField(
+                                      controller: f.name,
+                                      label: tr('Medication name',
+                                          'اسم الدواء'),
+                                      icon: Icons.medication,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _buildTextField(
+                                            controller: f.dose,
+                                            label: tr('Dose', 'الجرعة'),
+                                            icon: Icons.scale,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: _buildTextField(
+                                            controller: f.frequency,
+                                            label: tr('Frequency', 'التكرار'),
+                                            icon: Icons.schedule,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: TextButton.icon(
+                              onPressed: _addMedicationField,
+                              icon: const Icon(Icons.add),
+                              label: Text(
+                                  tr('Add medication', 'إضافة دواء جديد')),
+                            ),
+                          ),
+                        ] else ...[
+                          if (_medications.isEmpty)
+                            Text(
+                              tr('No medications recorded.',
+                                  'لا توجد أدوية مسجلة.'),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.gray600,
+                              ),
+                            )
+                          else
+                            Column(
+                              children: _medications.map((m) {
+                                final details = [
+                                  if (m.dose.trim().isNotEmpty) m.dose.trim(),
+                                  if (m.frequency.trim().isNotEmpty)
+                                    m.frequency.trim(),
+                                ].join(' • ');
+
+                                return Padding(
+                                  padding:
+                                      const EdgeInsets.only(bottom: 10),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.teal50,
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(
+                                          Icons.medication,
+                                          color: AppTheme.teal600,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              m.name,
+                                              maxLines: 1,
+                                              overflow:
+                                                  TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight:
+                                                    FontWeight.w600,
+                                                color: AppTheme.teal900,
+                                              ),
+                                            ),
+                                            if (details.isNotEmpty) ...[
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                details,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: AppTheme.gray600,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
 
                 // Actions: Edit / Save / Cancel
                 Align(
@@ -969,12 +1359,15 @@ class FamilyContact {
 // Models
 class Patient {
   final String name;
-  final int age; // not shown in UI
+  final int age;
   final String phone;
   final String email;
   final String address;
   final EmergencyContact? emergencyContact;
   final String? avatarPath;
+  final String? diseaseStage;
+  final String? medicalHistory;
+  final List<Medication> medications;
 
   const Patient({
     required this.name,
@@ -984,6 +1377,9 @@ class Patient {
     required this.address,
     this.emergencyContact,
     this.avatarPath,
+    this.diseaseStage,
+    this.medicalHistory,
+    this.medications = const [],
   });
 
   Patient copyWith({
@@ -994,6 +1390,9 @@ class Patient {
     String? address,
     EmergencyContact? emergencyContact,
     String? avatarPath,
+    String? diseaseStage,
+    String? medicalHistory,
+    List<Medication>? medications,
   }) {
     return Patient(
       name: name ?? this.name,
@@ -1003,6 +1402,9 @@ class Patient {
       address: address ?? this.address,
       emergencyContact: emergencyContact ?? this.emergencyContact,
       avatarPath: avatarPath ?? this.avatarPath,
+      diseaseStage: diseaseStage ?? this.diseaseStage,
+      medicalHistory: medicalHistory ?? this.medicalHistory,
+      medications: medications ?? this.medications,
     );
   }
 }
@@ -1017,4 +1419,34 @@ class EmergencyContact {
     required this.relation,
     required this.phone,
   });
+}
+
+class Medication {
+  final String name;
+  final String dose;
+  final String frequency;
+
+  const Medication({
+    required this.name,
+    required this.dose,
+    required this.frequency,
+  });
+}
+
+class _MedicationField {
+  final TextEditingController name;
+  final TextEditingController dose;
+  final TextEditingController frequency;
+
+  _MedicationField({
+    required this.name,
+    required this.dose,
+    required this.frequency,
+  });
+
+  void dispose() {
+    name.dispose();
+    dose.dispose();
+    frequency.dispose();
+  }
 }
