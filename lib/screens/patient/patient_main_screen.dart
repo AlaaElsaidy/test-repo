@@ -32,8 +32,8 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
     super.initState();
 
     // Initialize Lobna controller
-    _lobnaController = LobnaVoiceController();
-    _lobnaController.initialize();
+      _lobnaController = LobnaVoiceController();
+      _lobnaController.initialize();
 
     // ADDED: بيانات مريض افتراضية
     _patient = const Patient(
@@ -88,10 +88,12 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
           children: _screens,
         ),
       ),
-      floatingActionButton: LobnaListenButton(
-        controller: _lobnaController,
-        onTap: _openLobnaChat,
-      ),
+      floatingActionButton: _currentIndex == 3
+          ? null
+          : LobnaListenButton(
+              controller: _lobnaController,
+              onTap: _openLobnaChat,
+            ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
