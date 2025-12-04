@@ -12,26 +12,41 @@ class ChatFileService {
     required String chatId,
     required String senderId,
   }) async {
-    // Generate unique file name
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final extension = file.path.split('.').last;
-    final fileName = 'chat_${chatId}_${senderId}_$timestamp.$extension';
+    try {
+      print('=== UPLOAD FILE DEBUG ===');
+      print('Bucket: $_bucketName');
+      print('File path: ${file.path}');
+      print('File exists: ${await file.exists()}');
+      
+      // Generate unique file name
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final extension = file.path.split('.').last;
+      final fileName = 'chat_${chatId}_${senderId}_$timestamp.$extension';
+      print('Generated fileName: $fileName');
 
-    final bucket = _client.storage.from(_bucketName);
+      final bucket = _client.storage.from(_bucketName);
 
-    // Upload file
-    await bucket.upload(
-      fileName,
-      file,
-      fileOptions: const FileOptions(
-        upsert: false,
-        contentType: null, // Auto-detect
-      ),
-    );
+      // Upload file
+      print('Starting upload...');
+      await bucket.upload(
+        fileName,
+        file,
+        fileOptions: const FileOptions(
+          upsert: false,
+          contentType: null, // Auto-detect
+        ),
+      );
+      print('Upload successful!');
 
-    // Get public URL
-    final publicUrl = bucket.getPublicUrl(fileName);
-    return publicUrl;
+      // Get public URL
+      final publicUrl = bucket.getPublicUrl(fileName);
+      print('Public URL: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      print('=== UPLOAD ERROR ===');
+      print('Error: $e');
+      rethrow;
+    }
   }
 
   /// Get file URL (already public from uploadFile)

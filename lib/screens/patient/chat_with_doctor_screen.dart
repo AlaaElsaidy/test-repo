@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -262,12 +263,27 @@ class _ChatWithDoctorScreenState extends State<ChatWithDoctorScreen> {
   }
 
   Future<void> _pickFile() async {
-    // TODO: Implement file picker when file_picker package is added
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(tr('File picker not available yet', 'اختيار الملف غير متاح بعد')),
-      ),
-    );
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: false,
+      );
+      
+      if (result != null && result.files.isNotEmpty) {
+        final file = File(result.files.single.path!);
+        await _sendFile(file, 'file');
+      }
+    } catch (e) {
+      debugPrint('Error picking file: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(tr('Failed to pick file', 'فشل اختيار الملف')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showAttachmentOptions() {
