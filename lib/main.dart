@@ -54,16 +54,38 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
+// Global reference to access app state
+_MyAppState? appStateInstance;
+
 class _MyAppState extends State<MyApp> {
   StreamSubscription? _linkSubscription;
   late AppLinks _appLinks;
+  Locale _locale = const Locale('en');
 
   @override
   void initState() {
     super.initState();
+    appStateInstance = this;
     _appLinks = AppLinks();
     _handleInitialLink();
     _handleIncomingLinks();
+    _loadSavedLocale();
+  }
+
+  Future<void> _loadSavedLocale() async {
+    final savedLang = SharedPrefsHelper.getString('app_language');
+    if (savedLang != null && (savedLang == 'ar' || savedLang == 'en')) {
+      setState(() {
+        _locale = Locale(savedLang);
+      });
+    }
+  }
+
+  void changeLanguage(Locale newLocale) {
+    setState(() {
+      _locale = newLocale;
+    });
+    SharedPrefsHelper.saveString('app_language', newLocale.languageCode);
   }
 
   void _handleInitialLink() async {
@@ -118,6 +140,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void dispose() {
     _linkSubscription?.cancel();
+    appStateInstance = null;
     super.dispose();
   }
 
@@ -138,7 +161,7 @@ class _MyAppState extends State<MyApp> {
         onGenerateRoute: AppRouter.onGenerate,
         // home: Builder(builder: (context) => DoctorSelectionScreen(),),
         supportedLocales: const [Locale("en"), Locale("ar")],
-        locale: const Locale("en"),
+        locale: _locale,
         themeMode: ThemeMode.system,
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,

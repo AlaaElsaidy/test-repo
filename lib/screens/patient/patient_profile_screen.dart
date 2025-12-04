@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../theme/app_theme.dart';
+import '../../main.dart' show appStateInstance;
 
 class PatientProfileScreen extends StatefulWidget {
   // Patient is optional: if you still call const PatientProfileScreen(), it uses default demo data.
@@ -656,6 +657,25 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             key: _formKey,
             child: Column(
               children: [
+                // Language switcher button (top right)
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: Icon(
+                      _isAr ? Icons.language : Icons.translate,
+                      color: AppTheme.teal600,
+                      size: 28,
+                    ),
+                    tooltip: _isAr ? 'English' : 'العربية',
+                    onPressed: () {
+                      if (appStateInstance != null) {
+                        final newLocale = _isAr ? const Locale('en') : const Locale('ar');
+                        appStateInstance!.changeLanguage(newLocale);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
                 // Header (smaller, no age)
                 Container(
                   padding: const EdgeInsets.all(16),

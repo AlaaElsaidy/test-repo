@@ -43,6 +43,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   // Safe Zones from database
   List<SafeZone> _safeZones = [];
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -55,7 +60,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     if (userId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User ID not found')),
+          SnackBar(
+            content: Text(
+              tr('User ID not found', 'لم يتم العثور على هوية المستخدم'),
+            ),
+          ),
         );
       }
       return;
@@ -161,7 +170,10 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       if (!serviceEnabled) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please enable Location Services')),
+            SnackBar(
+              content: Text(tr('Please enable Location Services',
+                  'من فضلك فعّل خدمة الموقع على جهازك')),
+            ),
           );
         }
         await Geolocator.openLocationSettings();
@@ -177,7 +189,10 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
           permission == LocationPermission.denied) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission denied')),
+            SnackBar(
+              content: Text(tr('Location permission denied',
+                  'تم رفض صلاحية الوصول للموقع')),
+            ),
           );
         }
         setState(() => _loading = false);
@@ -222,7 +237,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Failed to save location: $e'),
+                content: Text(
+                  '${tr('Failed to save location', 'فشل حفظ الموقع')}: $e',
+                ),
                 backgroundColor: Colors.orange,
                 duration: const Duration(seconds: 3),
               ),
@@ -246,7 +263,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to get location: $e')),
+          SnackBar(
+            content: Text(
+              '${tr('Failed to get location', 'فشل الحصول على الموقع')}: $e',
+            ),
+          ),
         );
       }
       setState(() => _loading = false);
@@ -344,7 +365,10 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     final mapsLink = (lat != null && lng != null)
         ? 'https://www.google.com/maps/?q=$lat,$lng'
         : '';
-    final msg = 'EMERGENCY: I feel lost. My current location: $mapsLink';
+    final msg = tr(
+      'EMERGENCY: I feel lost. My current location: $mapsLink',
+      'طارئ: أشعر أنني تائه. موقعي الحالي: $mapsLink',
+    );
 
     bool openedWhatsApp = false;
     try {
@@ -360,9 +384,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(openedWhatsApp
-              ? 'Opening WhatsApp...'
-              : 'Opening emergency SMS...'),
+          content: Text(
+            openedWhatsApp
+                ? tr('Opening WhatsApp...', 'جاري فتح واتساب...')
+                : tr('Opening emergency SMS...', 'جاري فتح رسالة طارئة...'),
+          ),
         ),
       );
     }
@@ -372,10 +398,20 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   String _timeAgo(DateTime? t) {
     if (t == null) return '—';
     final d = DateTime.now().difference(t);
-    if (d.inMinutes < 1) return 'Just now';
-    if (d.inMinutes < 60) return '${d.inMinutes} mins ago';
-    if (d.inHours < 24) return '${d.inHours} hours ago';
-    return '${d.inDays} days ago';
+    if (d.inMinutes < 1) return tr('Just now', 'الآن');
+    if (d.inMinutes < 60) {
+      return _isAr
+          ? '${d.inMinutes} دقيقة مضت'
+          : '${d.inMinutes} mins ago';
+    }
+    if (d.inHours < 24) {
+      return _isAr
+          ? '${d.inHours} ساعة مضت'
+          : '${d.inHours} hours ago';
+    }
+    return _isAr
+        ? '${d.inDays} يومًا مضى'
+        : '${d.inDays} days ago';
   }
 
   double _deg2rad(double d) => d * pi / 180.0;
@@ -434,7 +470,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         markerId: const MarkerId('current_location'),
         position: LatLng(_pos!.latitude, _pos!.longitude),
         infoWindow: InfoWindow(
-          title: 'You are here',
+          title: tr('You are here', 'أنت هنا'),
           snippet: _address ??
               '${_pos!.latitude.toStringAsFixed(5)}, ${_pos!.longitude.toStringAsFixed(5)}',
         ),
@@ -448,11 +484,13 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   @override
   Widget build(BuildContext context) {
     final statusColor = _insideAnyZone ? Colors.green : Colors.red;
-    final statusText = _insideAnyZone ? 'Safe Zone' : 'Outside Zone';
+    final statusText = _insideAnyZone
+        ? tr('Safe Zone', 'منطقة آمنة')
+        : tr('Outside Zone', 'خارج المنطقة الآمنة');
 
     final addressText = _address ??
         (_pos == null
-            ? 'Fetching location...'
+            ? tr('Fetching location...', 'جارٍ تحديد الموقع...')
             : '${_pos!.latitude.toStringAsFixed(5)}, ${_pos!.longitude.toStringAsFixed(5)}');
 
     return SafeArea(
@@ -571,9 +609,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      'Current Location',
-                                      style: TextStyle(
+                                    Text(
+                                      tr('Current Location', 'الموقع الحالي'),
+                                      style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
                                         color: AppTheme.teal900,
@@ -590,8 +628,10 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                     const SizedBox(height: 4),
                                     Text(
                                       _insideAnyZone
-                                          ? 'Within safe zone'
-                                          : 'Outside safe zone',
+                                          ? tr('Within safe zone',
+                                              'داخل المنطقة الآمنة')
+                                          : tr('Outside safe zone',
+                                              'خارج المنطقة الآمنة'),
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: _insideAnyZone
@@ -628,9 +668,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Last Updated',
-                                  style: TextStyle(
+                                Text(
+                                  tr('Last Updated', 'آخر تحديث'),
+                                  style: const TextStyle(
                                       fontSize: 14, color: AppTheme.teal900),
                                 ),
                                 Text(
@@ -655,7 +695,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                   ),
                                 )
                               : const Icon(Icons.refresh),
-                          label: Text(_loading ? 'Refreshing' : 'Refresh'),
+                          label: Text(_loading
+                              ? tr('Refreshing', 'جارٍ التحديث')
+                              : tr('Refresh', 'تحديث')),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.teal500,
                             foregroundColor: Colors.white,
@@ -688,22 +730,25 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                     color: Colors.white),
                               ),
                               const SizedBox(width: 16),
-                              const Expanded(
+                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Emergency Alert',
-                                      style: TextStyle(
+                                      tr('Emergency Alert', 'تنبيه طارئ'),
+                                      style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.orange,
                                       ),
                                     ),
-                                    SizedBox(height: 8),
+                                    const SizedBox(height: 8),
                                     Text(
-                                      'If you feel lost, tap the button below to notify your caregiver with your current location.',
-                                      style: TextStyle(
+                                      tr(
+                                        'If you feel lost, tap the button below to notify your caregiver with your current location.',
+                                        'لو شعرت أنك تائه، اضغط على الزر بالأسفل لإرسال موقعك الحالي لمقدم الرعاية.',
+                                      ),
+                                      style: const TextStyle(
                                           fontSize: 14, color: Colors.orange),
                                     ),
                                   ],
@@ -723,7 +768,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                     padding: const EdgeInsets.symmetric(
                                         vertical: 14),
                                   ),
-                                  child: const Text('Send via WhatsApp/SMS'),
+                                  child: Text(tr('Send via WhatsApp/SMS',
+                                      'إرسال عبر واتساب / رسالة نصية')),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -733,7 +779,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                     ? () => _callNumber(_emergencyPhone!)
                                     : null,
                                 icon: const Icon(Icons.call),
-                                label: const Text('Call'),
+                                label: Text(tr('Call', 'اتصال')),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.orange,
                                   side: const BorderSide(color: Colors.orange),

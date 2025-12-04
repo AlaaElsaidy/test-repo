@@ -126,6 +126,9 @@ class _FamilyMainScreenState extends State<FamilyMainScreen> {
   @override
   Widget build(BuildContext context) {
     final textScale = MediaQuery.of(context).textScaleFactor.clamp(0.8, 1.2);
+    final isAr =
+        (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+    String tr(String en, String ar) => isAr ? ar : en;
 
     return NotificationListenerWidget(
       showSnackBar: true,
@@ -157,11 +160,15 @@ class _FamilyMainScreenState extends State<FamilyMainScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.home, 'Home', textScale),
-                _buildNavItem(1, Icons.location_on, 'Tracking', textScale),
-                _buildNavItem(4, Icons.psychology, 'Activities', textScale),
-                _buildNavItem(2, Icons.chat, 'Chat', textScale),
-                _buildNavItem(3, Icons.person, 'Profile', textScale),
+                _buildNavItem(
+                    0, Icons.home, tr('Home', 'الرئيسية'), textScale),
+                _buildNavItem(1, Icons.location_on,
+                    tr('Tracking', 'تتبع المريض'), textScale),
+                _buildNavItem(4, Icons.psychology,
+                    tr('Activities', 'الأنشطة'), textScale),
+                _buildNavItem(2, Icons.chat, tr('Chat', 'المحادثات'), textScale),
+                _buildNavItem(3, Icons.person,
+                    tr('Profile', 'الملف الشخصي'), textScale),
               ],
             ),
           ),

@@ -52,6 +52,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
   String? _patientPhotoUrl;
   bool _loadingPatient = false;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -177,7 +182,10 @@ class _PatientDashboardState extends State<PatientDashboard> {
         t.cancel();
         _lock = true;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Time's up! Try again ⏳")),
+          SnackBar(
+            content: Text(tr("Time's up! Try again ⏳",
+                'انتهى الوقت! جرّب مرة أخرى ⏳')),
+          ),
         );
         setState(() {});
         return;
@@ -239,8 +247,14 @@ class _PatientDashboardState extends State<PatientDashboard> {
         }
       }
       final msg = _mode == GameMode.challenge
-          ? "Well done! You matched all pairs 🎉  ${'⭐' * stars}"
-          : "Well done! You matched all pairs 🎉";
+          ? tr(
+              "Well done! You matched all pairs 🎉  ${'⭐' * stars}",
+              "عمل رائع! طابقت كل الكروت 🎉  ${'⭐' * stars}",
+            )
+          : tr(
+              "Well done! You matched all pairs 🎉",
+              "عمل رائع! طابقت كل الكروت 🎉",
+            );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg)),
@@ -390,9 +404,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Hi, Welcome Back',
-                          style: TextStyle(
+                        Text(
+                          tr('Hi, Welcome Back', 'أهلًا، سعيد برؤيتك من جديد'),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -421,7 +435,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
               runSpacing: 8,
               children: [
                 ChoiceChip(
-                  label: const Text('Calm'),
+                  label: Text(tr('Calm', 'وضع هادئ')),
                   selected: _mode == GameMode.calm,
                   onSelected: (v) {
                     if (_mode != GameMode.calm) {
@@ -431,7 +445,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   },
                 ),
                 ChoiceChip(
-                  label: const Text('Challenge'),
+                  label: Text(tr('Challenge', 'وضع التحدي')),
                   selected: _mode == GameMode.challenge,
                   onSelected: (v) {
                     if (_mode != GameMode.challenge) {
@@ -465,7 +479,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         color: AppTheme.teal600, size: 18),
                     const SizedBox(width: 6),
                     Text(
-                      'Memorize the cards… ${_previewLeft}s',
+                      tr('Memorize the cards… ${_previewLeft}s',
+                          'حاول تحفظ الكروت… ${_previewLeft}ث'),
                       style: const TextStyle(color: AppTheme.teal600),
                     ),
                   ],
@@ -554,7 +569,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
               child: ElevatedButton.icon(
                 onPressed: _initGame,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Play Again'),
+                label: Text(tr('Play Again', 'ألعب مرة أخرى')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.teal600,
                   foregroundColor: Colors.white,

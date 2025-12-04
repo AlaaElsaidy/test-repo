@@ -34,6 +34,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -83,7 +88,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     showErrorDialog(
                         context: context,
                         error: state.errorMessage,
-                        title: "Register Failed");
+                        title: tr('Register Failed', 'فشل التسجيل'));
                   }
                   if (state is AddFamilySuccess) {
                     Navigator.pushReplacementNamed(context, AppRoutes.service);
@@ -92,7 +97,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     showErrorDialog(
                         context: context,
                         error: state.errorMessage,
-                        title: "Register Failed");
+                        title: tr('Register Failed', 'فشل التسجيل'));
                   }
                 },
                 child: BlocBuilder<SignUpCubit, SignUpState>(
@@ -105,7 +110,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           children: [
                             SizedBox(height: context.h(16)),
                             Text(
-                              'Create Account',
+                              tr('Create Account', 'إنشاء حساب'),
                               style: TextStyle(
                                 color: const Color(0xFF0E3E3B),
                                 fontWeight: FontWeight.w800,
@@ -114,7 +119,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             ),
                             SizedBox(height: context.h(6)),
                             Text(
-                              'Sign up with your email',
+                              tr('Sign up with your email',
+                                  'سجّل باستخدام بريدك الإلكتروني'),
                               style: TextStyle(
                                 color: const Color(0xFF7EA9A3),
                                 fontWeight: FontWeight.w600,
@@ -156,7 +162,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Account Information',
+                                        tr('Account Information',
+                                            'بيانات الحساب'),
                                         style: TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: context.sp(18),
@@ -168,7 +175,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                                       // Full Name
                                       Text(
-                                        'Full Name',
+                                        tr('Full Name', 'الاسم الكامل'),
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -182,7 +189,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                           textEditingController:
                                               _nameController,
                                           validator: (v) => nameValidator(v),
-                                          hintText: "Enter your name",
+                                          hintText: tr('Enter your name',
+                                              'ادخل اسمك بالكامل'),
                                           textInputType: TextInputType.name,
                                         ),
                                       ),
@@ -190,7 +198,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       SizedBox(height: context.h(16)),
 
                                       Text(
-                                        'Email Address',
+                                        tr('Email Address', 'البريد الإلكتروني'),
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -205,7 +213,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                           textEditingController:
                                               _emailController,
                                           validator: (v) => emailValidator(v),
-                                          hintText: "example@mail.com",
+                                          hintText: tr(
+                                              'example@mail.com', 'example@mail.com'),
                                           textInputType:
                                               TextInputType.emailAddress,
                                         ),
@@ -214,7 +223,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       SizedBox(height: context.h(16)),
 
                                       Text(
-                                        'Password',
+                                        tr('Password', 'كلمة المرور'),
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -229,7 +238,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                               _passwordController,
                                           validator: (v) =>
                                               passwordValidator(v),
-                                          hintText: "Enter your password",
+                                          hintText: tr('Enter your password',
+                                              'ادخل كلمة المرور'),
                                           textInputType: TextInputType.text,
                                           secure: true,
                                         ),
@@ -238,7 +248,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       SizedBox(height: context.h(16)),
 
                                       Text(
-                                        'Confirm Password',
+                                        tr('Confirm Password',
+                                            'تأكيد كلمة المرور'),
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -256,7 +267,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                             v,
                                             _passwordController.text,
                                           ),
-                                          hintText: "Re-enter your password",
+                                          hintText: tr(
+                                              'Re-enter your password',
+                                              'أعد إدخال كلمة المرور'),
                                           textInputType: TextInputType.text,
                                           secure: true,
                                         ),
@@ -282,8 +295,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                           },
                                           text: state is SignUpLoading ||
                                                   state is AddFamilyLoading
-                                              ? "Loading..."
-                                              : "Signup",
+                                              ? tr('Loading...', 'جارٍ التحميل...')
+                                              : tr('Signup', 'تسجيل'),
                                         ),
                                       ),
                                     ],

@@ -34,6 +34,11 @@ class _DoctorSelectionScreenState extends State<DoctorSelectionScreen> {
   late List<Doctor> _filtered;
   String? _selectedId;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -100,13 +105,13 @@ class _DoctorSelectionScreenState extends State<DoctorSelectionScreen> {
                     showErrorDialog(
                         context: context,
                         error: state.errorMessage,
-                        title: "Doctor Failed!");
+                        title: tr("Doctor Failed!", "فشل الطبيب!"));
                   }
                   if (state is UpdateFamilyFailure) {
                     showErrorDialog(
                         context: context,
                         error: state.errorMessage,
-                        title: "Updating Failed");
+                        title: tr("Updating Failed", "فشل التحديث"));
                   }
                 },
                 child: BlocBuilder<DoctorCubit, DoctorState>(
@@ -129,7 +134,7 @@ class _DoctorSelectionScreenState extends State<DoctorSelectionScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Text(
-                                      "Select Doctor",
+                                      tr("Select Doctor", "اختر طبيب"),
                                       style: TextStyle(
                                         color: const Color(0xFF0E3E3B),
                                         fontSize: context.sp(26),
@@ -138,7 +143,7 @@ class _DoctorSelectionScreenState extends State<DoctorSelectionScreen> {
                                     ),
                                     SizedBox(height: context.h(6)),
                                     Text(
-                                      "Choose one doctor from the list",
+                                      tr("Choose one doctor from the list", "اختر طبيباً واحداً من القائمة"),
                                       style: TextStyle(
                                         color: const Color(0xFF7EA9A3),
                                         fontWeight: FontWeight.w600,
@@ -151,7 +156,7 @@ class _DoctorSelectionScreenState extends State<DoctorSelectionScreen> {
                                     Align(
                                       alignment: Alignment.centerLeft,
                                       child: Text(
-                                        "Results: ${_filtered.isEmpty ? _doctors.length : _filtered.length}",
+                                        tr("Results: ${_filtered.isEmpty ? _doctors.length : _filtered.length}", "النتائج: ${_filtered.isEmpty ? _doctors.length : _filtered.length}"),
                                         style: TextStyle(
                                           color: const Color(0xFF7EA9A3),
                                           fontWeight: FontWeight.w700,
@@ -170,7 +175,7 @@ class _DoctorSelectionScreenState extends State<DoctorSelectionScreen> {
                                   child: _doctors.isEmpty
                                       ? Center(
                                           child: Text(
-                                            'No doctors found',
+                                            tr('No doctors found', 'لم يتم العثور على أطباء'),
                                             style: TextStyle(
                                               color: const Color(0xFF7EA9A3),
                                               fontWeight: FontWeight.w600,
@@ -222,8 +227,8 @@ class _DoctorSelectionScreenState extends State<DoctorSelectionScreen> {
                                       if (selected.id.isEmpty) {
                                         showErrorDialog(
                                             context: context,
-                                            error: "please select a doctor.",
-                                            title: "Selection Failed!");
+                                            error: tr("please select a doctor.", "يرجى اختيار طبيب."),
+                                            title: tr("Selection Failed!", "فشل الاختيار!"));
                                         return;
                                       }
                                       await BlocProvider.of<DoctorCubit>(
@@ -235,8 +240,8 @@ class _DoctorSelectionScreenState extends State<DoctorSelectionScreen> {
                                               data: {"doctor_id": _selectedId});
                                     },
                                     text: state is AddFamilyLoading
-                                        ? "Loading..."
-                                        : "Confirm Selection",
+                                        ? tr("Loading...", "جاري التحميل...")
+                                        : tr("Confirm Selection", "تأكيد الاختيار"),
                                   ),
                                 ),
                               ),
@@ -308,8 +313,8 @@ class _DoctorSelectionScreenState extends State<DoctorSelectionScreen> {
               focusNode: _searchFocus,
               controller: _searchController,
               textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(
-                hintText: "Search by name ",
+              decoration: InputDecoration(
+                hintText: tr("Search by name ", "البحث بالاسم "),
                 border: InputBorder.none,
               ),
             ),

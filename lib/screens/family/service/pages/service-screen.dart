@@ -18,6 +18,11 @@ class ServiceScreen extends StatefulWidget {
 class _ServiceScreenState extends State<ServiceScreen> {
   final int price = 150;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -45,7 +50,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "Your Care Package",
+                    tr("Your Care Package", "باقة الرعاية الخاصة بك"),
                     style: TextStyle(
                       color: const Color(0xFF0E3E3B),
                       fontSize: context.sp(26),
@@ -54,7 +59,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   ),
                   SizedBox(height: context.h(6)),
                   Text(
-                    "Doctor + Mentor included",
+                    tr("Doctor + Mentor included", "طبيب + مرشد متضمن"),
                     style: TextStyle(
                       color: const Color(0xFF7EA9A3),
                       fontWeight: FontWeight.w600,
@@ -64,14 +69,14 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   SizedBox(height: context.h(24)),
 
                   ServiceItem(
-                    title: "Full Package",
+                    title: tr("Full Package", "الباقة الكاملة"),
                     price: "$price\$",
                     path: Assets.images.png.both.path,
-                    features: const [
-                      "Doctor follow-ups",
-                      "Mentor sessions",
-                      "24/7 support",
-                      "Reminders & tracking",
+                    features: [
+                      tr("Doctor follow-ups", "متابعة الطبيب"),
+                      tr("Mentor sessions", "جلسات المرشد"),
+                      tr("24/7 support", "دعم على مدار الساعة"),
+                      tr("Reminders & tracking", "التذكيرات والتتبع"),
                     ],
                   ),
 
@@ -99,7 +104,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                     child: Row(
                       children: [
                         Text(
-                          "Total Price",
+                          tr("Total Price", "السعر الإجمالي"),
                           style: TextStyle(
                             color: AppColors.blackColor,
                             fontSize: context.sp(18),
@@ -127,7 +132,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                       onClick: () {
                         Navigator.pushNamed(context, AppRoutes.doctorSelection);
                       },
-                      text: "Next",
+                      text: tr("Next", "التالي"),
                     ),
                   ),
                 ],

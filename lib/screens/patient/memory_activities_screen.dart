@@ -40,6 +40,11 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
   String? _patientId;
   String? _patientName;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   // Week state
   DateTime _weekStart = _startOfWeek(DateTime.now());
   DateTime _selectedDay = DateTime.now();
@@ -86,7 +91,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
       
       if (userId == null) {
         setState(() {
-          _error = 'User ID not found';
+          _error = tr('User ID not found', 'لم يتم العثور على هوية المستخدم');
           _loading = false;
         });
         return;
@@ -97,7 +102,8 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
       
       if (patientRecord == null || patientRecord['id'] == null) {
         setState(() {
-          _error = 'Patient record not found';
+          _error = tr(
+              'Patient record not found', 'لم يتم العثور على سجل المريض');
           _loading = false;
         });
         return;
@@ -147,7 +153,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load activities: $e';
+        _error = '${tr('Failed to load activities', 'فشل تحميل الأنشطة')}: $e';
         _loading = false;
       });
     }
@@ -231,7 +237,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                     width: isSmall ? double.infinity : 160,
                     child: ElevatedButton(
                       onPressed: _loadActivities,
-                      child: const Text('Retry'),
+                      child: Text(tr('Retry', 'إعادة المحاولة')),
                     ),
                   ),
                 ],
@@ -276,7 +282,7 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Memory Activities',
+                              tr('Memory Activities', 'أنشطة الذاكرة'),
                               style: TextStyle(
                                 fontSize: titleSize,
                                 fontWeight: FontWeight.bold,
@@ -285,7 +291,8 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Keep your mind active and engaged',
+                              tr('Keep your mind active and engaged',
+                                  'حافظ على نشاط عقلك وتفاعلك'),
                               style: TextStyle(
                                 fontSize: subtitleSize,
                                 color: kGray600,
@@ -333,8 +340,8 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const TabBar(
-                      indicator: BoxDecoration(
+                    child: TabBar(
+                      indicator: const BoxDecoration(
                         gradient: kTealGradient,
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
@@ -342,8 +349,8 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
                       labelColor: Colors.white,
                       unselectedLabelColor: kGray600,
                       tabs: [
-                        Tab(text: 'Today'),
-                        Tab(text: 'Schedule'),
+                        Tab(text: tr('Today', 'اليوم')),
+                        Tab(text: tr('Schedule', 'الجدول')),
                       ],
                     ),
                   ),
@@ -526,9 +533,12 @@ class _MemoryActivitiesScreenState extends State<MemoryActivitiesScreen> {
 
   Widget _buildPatientList(List<Map<String, dynamic>> list) {
     if (list.isEmpty) {
-      return const Center(
-          child:
-              Text('No activities found.', style: TextStyle(color: kGray600)));
+      return Center(
+        child: Text(
+          tr('No activities found.', 'لا توجد أنشطة مسجلة.'),
+          style: const TextStyle(color: kGray600),
+        ),
+      );
     }
     return ListView.builder(
       itemCount: list.length,
@@ -616,16 +626,22 @@ class _ProgressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isAr =
+        (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+    String tr(String en, String ar) => isAr ? ar : en;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
           gradient: kTealGradient, borderRadius: BorderRadius.circular(16)),
       child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-            Text('Today\'s Progress',
-                style: TextStyle(color: Color(0xFFCFFAFE), fontSize: 14)),
-            SizedBox(height: 4),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              tr("Today's Progress", 'تقدم اليوم'),
+              style: const TextStyle(color: Color(0xFFCFFAFE), fontSize: 14),
+            ),
+            const SizedBox(height: 4),
           ]),
           Container(
             width: 64,
@@ -637,11 +653,11 @@ class _ProgressCard extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 8),
-        Text('$done/$total Activities',
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold)),
+        Text(
+          isAr ? 'نشاط $done من $total' : '$done/$total Activities',
+          style: const TextStyle(
+              color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 12),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
@@ -653,8 +669,11 @@ class _ProgressCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        const Text('Great job! Keep going! 💪',
-            style: TextStyle(color: Color(0xFFCFFAFE), fontSize: 14)),
+        Text(
+          tr('Great job! Keep going! 💪', 'عمل رائع! استمر 💪'),
+          style:
+              const TextStyle(color: Color(0xFFCFFAFE), fontSize: 14),
+        ),
       ]),
     );
   }

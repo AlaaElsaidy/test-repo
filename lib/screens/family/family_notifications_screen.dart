@@ -22,6 +22,11 @@ class _FamilyNotificationsScreenState
   String? _error;
   String? _familyId;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -40,7 +45,7 @@ class _FamilyNotificationsScreenState
 
       if (familyId == null) {
         setState(() {
-          _error = 'Family account not found';
+          _error = tr('Family account not found', 'تعذّر العثور على حساب العائلة');
           _loading = false;
         });
         return;
@@ -58,7 +63,7 @@ class _FamilyNotificationsScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load notifications: $e';
+        _error = tr('Failed to load notifications', 'فشل تحميل الإشعارات') + ': $e';
         _loading = false;
       });
     }
@@ -129,16 +134,16 @@ class _FamilyNotificationsScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('الإشعارات'),
+        title: Text(tr('Notifications', 'الإشعارات')),
         backgroundColor: AppTheme.teal600,
         foregroundColor: Colors.white,
         actions: [
           if (_notifications.isNotEmpty)
             TextButton(
               onPressed: _markAllAsRead,
-              child: const Text(
-                'تحديد الكل كمقروء',
-                style: TextStyle(color: Colors.white, fontSize: 12),
+              child: Text(
+                tr('Mark all as read', 'تحديد الكل كمقروء'),
+                style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
             ),
         ],
@@ -163,10 +168,10 @@ class _FamilyNotificationsScreenState
     }
 
     if (_notifications.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'لا توجد إشعارات بعد.',
-          style: TextStyle(color: AppTheme.gray500),
+          tr('No notifications yet.', 'لا توجد إشعارات بعد.'),
+          style: const TextStyle(color: AppTheme.gray500),
         ),
       );
     }

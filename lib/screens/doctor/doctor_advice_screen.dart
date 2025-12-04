@@ -28,6 +28,11 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
   bool _addingTip = false;
   final List<String> _tips = [];
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   // Video (Gallery only)
   final ImagePicker _picker = ImagePicker();
   XFile? _videoXFile;
@@ -54,7 +59,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
   Future<void> _initData() async {
     final doctorId = SharedPrefsHelper.getString("userId");
     if (doctorId == null) {
-      _snack('Doctor ID not found. Please login again.');
+      _snack(tr('Doctor ID not found. Please login again.', 'تعذّر العثور على معرف الطبيب. يرجى تسجيل الدخول مرة أخرى.'));
       setState(() {
         _loadingAdvice = false;
         _loadingFamilies = false;
@@ -74,7 +79,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
         _loadingAdvice = false;
       });
     } catch (e) {
-      _snack('Failed to load advice: $e');
+      _snack(tr('Failed to load advice', 'فشل تحميل النصائح') + ': $e');
       setState(() => _loadingAdvice = false);
     }
   }
@@ -91,7 +96,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
         _loadingFamilies = false;
       });
     } catch (e) {
-      _snack('Failed to load families: $e');
+      _snack(tr('Failed to load families', 'فشل تحميل العائلات') + ': $e');
       setState(() => _loadingFamilies = false);
     }
   }
@@ -124,7 +129,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
       });
     } catch (e) {
       debugPrint('Pick video error: $e');
-      _snack('Could not pick video');
+      _snack(tr('Could not pick video', 'تعذّر اختيار الفيديو'));
     }
   }
 
@@ -180,11 +185,11 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
   // ============== Save / Share ==============
   bool _validateForm() {
     if (_tips.isEmpty && _videoXFile == null) {
-      _snack('Add at least one tip or attach a video');
+      _snack(tr('Add at least one tip or attach a video', 'أضف نصيحة واحدة على الأقل أو أرفق فيديو'));
       return false;
     }
     if (_selectedFamilyId == null) {
-      _snack('Select a family member to receive the advice');
+      _snack(tr('Select a family member to receive the advice', 'اختر عضو عائلة لتلقي النصيحة'));
       return false;
     }
     return true;
@@ -205,12 +210,12 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
   Future<void> _submitAdvice() async {
     if (!_validateForm()) return;
     if (_doctorId == null) {
-      _snack('Doctor ID not found');
+      _snack(tr('Doctor ID not found', 'تعذّر العثور على معرف الطبيب'));
       return;
     }
     final familyId = _selectedFamilyId;
     if (familyId == null) {
-      _snack('Select a family member');
+      _snack(tr('Select a family member', 'اختر عضو عائلة'));
       return;
     }
 
@@ -228,7 +233,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
         } catch (uploadError) {
           debugPrint('Video upload failed: $uploadError');
           // Continue without video - save advice without video URL
-          _snack('Warning: Video upload failed, saving advice without video. Error: $uploadError');
+          _snack(tr('Warning: Video upload failed, saving advice without video. Error: $uploadError', 'تحذير: فشل رفع الفيديو، يتم حفظ النصيحة بدون فيديو. خطأ: $uploadError'));
         }
       }
 
@@ -245,10 +250,10 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
         _adviceList.insert(0, advice);
       });
 
-      _snack('Advice sent successfully');
+      _snack(tr('Advice sent successfully', 'تم إرسال النصيحة بنجاح'));
       _clearForm();
     } catch (e) {
-      _snack('Failed to save advice: $e');
+      _snack(tr('Failed to save advice', 'فشل حفظ النصيحة') + ': $e');
     } finally {
       setState(() => _sending = false);
     }
@@ -258,16 +263,16 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete Advice'),
-        content: const Text('Are you sure you want to delete this advice?'),
+        title: Text(tr('Delete Advice', 'حذف النصيحة')),
+        content: Text(tr('Are you sure you want to delete this advice?', 'هل أنت متأكد أنك تريد حذف هذه النصيحة؟')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel', 'إلغاء')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(tr('Delete', 'حذف'), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -293,11 +298,11 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
         await _loadAdvice(_doctorId!);
       }
       
-      _snack('Advice deleted successfully');
+      _snack(tr('Advice deleted successfully', 'تم حذف النصيحة بنجاح'));
     } catch (e) {
       debugPrint('Delete advice error: $e');
       if (!mounted) return;
-      _snack('Failed to delete advice: $e');
+      _snack(tr('Failed to delete advice', 'فشل حذف النصيحة') + ': $e');
       
       // Reload to ensure UI is in sync with database
       if (_doctorId != null) {
@@ -309,16 +314,16 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
   Future<void> _openVideoUrl(String url) async {
     final uri = Uri.tryParse(url);
     if (uri == null) {
-      _snack('Invalid video url');
+      _snack(tr('Invalid video url', 'رابط فيديو غير صحيح'));
       return;
     }
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      _snack('Could not open video');
+      _snack(tr('Could not open video', 'تعذّر فتح الفيديو'));
     }
   }
 
   String _familyName(String? id) {
-    if (id == null) return 'Family';
+    if (id == null) return tr('Family', 'عائلة');
     final match = _families.firstWhere(
       (f) => f['id'] == id,
       orElse: () => {},
@@ -369,7 +374,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Doctor Advice',
+                        tr('Doctor Advice', 'نصيحة الطبيب'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -388,8 +393,8 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                             .withOpacity(0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        a.status == 'sent' ? 'Sent' : a.status,
+                      child:                       Text(
+                        a.status == 'sent' ? tr('Sent', 'تم الإرسال') : a.status,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -406,7 +411,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Family: ${_familyName(a.familyMemberId)}',
+                  tr('Family: ${_familyName(a.familyMemberId)}', 'العائلة: ${_familyName(a.familyMemberId)}'),
                   style: const TextStyle(fontSize: 12, color: AppTheme.gray500),
                 ),
                 const SizedBox(height: 12),
@@ -414,14 +419,14 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                   ElevatedButton.icon(
                     onPressed: () => _openVideoUrl(a.videoUrl!),
                     icon: const Icon(Icons.play_arrow),
-                    label: const Text('Play video'),
+                    label: Text(tr('Play video', 'تشغيل الفيديو')),
                   ),
                   const SizedBox(height: 12),
                 ],
                 if (a.tips.isNotEmpty) ...[
-                  const Text(
-                    'Tips',
-                    style: TextStyle(
+                  Text(
+                    tr('Tips', 'نصائح'),
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.teal900,
@@ -464,7 +469,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                           await _deleteAdvice(a);
                         },
                         icon: const Icon(Icons.delete),
-                        label: const Text('Delete Advice'),
+                        label: Text(tr('Delete Advice', 'حذف النصيحة')),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
                           foregroundColor: Colors.white,
@@ -478,7 +483,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () => Navigator.pop(context),
                         icon: const Icon(Icons.close),
-                        label: const Text('Close'),
+                        label: Text(tr('Close', 'إغلاق')),
                       ),
                     );
 
@@ -525,23 +530,23 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
-                        'Doctor\'s Advice',
+                        tr('Doctor\'s Advice', 'نصائح الطبيب'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.teal900,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        'Upload a video from phone and send to relatives',
+                        tr('Upload a video from phone and send to relatives', 'ارفع فيديو من الهاتف وأرسله للأقارب'),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 14, color: AppTheme.gray600),
+                        style: const TextStyle(fontSize: 14, color: AppTheme.gray600),
                       ),
                     ],
                   ),
@@ -575,13 +580,13 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                 },
                 borderRadius: BorderRadius.circular(20),
                 constraints: const BoxConstraints(minHeight: 40, minWidth: 120),
-                children: const [
+                children: [
                   Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: Text('Create')),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text(tr('Create', 'إنشاء'))),
                   Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: Text('My Advice')),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text(tr('My Advice', 'نصائحي'))),
                 ],
               ),
             ),
@@ -603,9 +608,9 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Create Advice',
-              style: TextStyle(
+            Text(
+              tr('Create Advice', 'إنشاء نصيحة'),
+              style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.teal900),
@@ -624,17 +629,17 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                   color: Colors.orange[50],
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
-                  'No family members assigned to you yet. Once a family is linked, you can send advice here.',
-                  style: TextStyle(fontSize: 13, color: AppTheme.teal900),
+                child: Text(
+                  tr('No family members assigned to you yet. Once a family is linked, you can send advice here.', 'لم يتم تعيين أعضاء عائلة لك بعد. بمجرد ربط عائلة، يمكنك إرسال النصائح هنا.'),
+                  style: const TextStyle(fontSize: 13, color: AppTheme.teal900),
                 ),
               )
             else
               DropdownButtonFormField<String>(
                 value: _selectedFamilyId,
-                decoration: const InputDecoration(
-                  labelText: 'Select family',
-                  prefixIcon: Icon(Icons.family_restroom),
+                decoration: InputDecoration(
+                  labelText: tr('Select family', 'اختر عائلة'),
+                  prefixIcon: const Icon(Icons.family_restroom),
                   filled: true,
                 ),
                 items: _families
@@ -642,7 +647,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                       (f) => DropdownMenuItem(
                         value: f['id'] as String?,
                         child: Text(
-                          (f['name'] as String?) ?? 'Family member',
+                          (f['name'] as String?) ?? tr('Family member', 'عضو عائلة'),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -662,9 +667,9 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
             const SizedBox(height: 12),
 
             // Tips section
-            const Text(
-              'Tips',
-              style: TextStyle(
+            Text(
+              tr('Tips', 'نصائح'),
+              style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.teal900),
@@ -724,15 +729,15 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                       OutlinedButton.icon(
                         onPressed: _pickVideoFromGallery,
                         icon: const Icon(Icons.video_file),
-                        label: const Text('Replace video'),
+                        label: Text(tr('Replace video', 'استبدال الفيديو')),
                       ),
                       const SizedBox(width: 8),
                       TextButton.icon(
                         onPressed: _removeVideo,
                         icon:
                             const Icon(Icons.delete_outline, color: Colors.red),
-                        label: const Text('Remove',
-                            style: TextStyle(color: Colors.red)),
+                        label: Text(tr('Remove', 'إزالة'),
+                            style: const TextStyle(color: Colors.red)),
                       ),
                     ],
                   ),
@@ -762,7 +767,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
             child: ElevatedButton.icon(
               onPressed: _beginAddTip,
               icon: const Icon(Icons.add),
-              label: const Text('Add tip'),
+              label: Text(tr('Add tip', 'إضافة نصيحة')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.teal600,
                 foregroundColor: Colors.white,
@@ -780,9 +785,9 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
               TextField(
                 focusNode: _tipFocus,
                 controller: _tipCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Write a tip',
-                  prefixIcon: Icon(Icons.lightbulb),
+                decoration: InputDecoration(
+                  labelText: tr('Write a tip', 'اكتب نصيحة'),
+                  prefixIcon: const Icon(Icons.lightbulb),
                   filled: true,
                 ),
                 onSubmitted: (_) => _addTip(),
@@ -797,7 +802,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                       child: ElevatedButton.icon(
                         onPressed: _addTip,
                         icon: const Icon(Icons.check),
-                        label: const Text('Add'),
+                        label: Text(tr('Add', 'إضافة')),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.teal600,
                           foregroundColor: Colors.white,
@@ -812,7 +817,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                       child: OutlinedButton.icon(
                         onPressed: _cancelAddTip,
                         icon: const Icon(Icons.close),
-                        label: const Text('Done'),
+                        label: Text(tr('Done', 'تم')),
                       ),
                     ),
                   ),
@@ -829,9 +834,9 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
               child: TextField(
                 focusNode: _tipFocus,
                 controller: _tipCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Write a tip',
-                  prefixIcon: Icon(Icons.lightbulb),
+                decoration: InputDecoration(
+                  labelText: tr('Write a tip', 'اكتب نصيحة'),
+                  prefixIcon: const Icon(Icons.lightbulb),
                   filled: true,
                 ),
                 onSubmitted: (_) => _addTip(),
@@ -846,7 +851,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                 child: ElevatedButton.icon(
                   onPressed: _addTip,
                   icon: const Icon(Icons.check),
-                  label: const Text('Add', overflow: TextOverflow.ellipsis),
+                  label: Text(tr('Add', 'إضافة'), overflow: TextOverflow.ellipsis),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.teal600,
                     foregroundColor: Colors.white,
@@ -860,7 +865,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
               child: OutlinedButton.icon(
                 onPressed: _cancelAddTip,
                 icon: const Icon(Icons.close),
-                label: const Text('Done'),
+                label: Text(tr('Done', 'تم')),
               ),
             ),
           ],
@@ -880,7 +885,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
             onPressed: _sending || _families.isEmpty ? null : _sendToRelative,
             icon: const Icon(Icons.send),
             label: Text(
-              _sending ? 'Sending...' : 'Send to relative',
+              _sending ? tr('Sending...', 'جاري الإرسال...') : tr('Send to relative', 'إرسال للقريب'),
               overflow: TextOverflow.ellipsis,
             ),
             style: ElevatedButton.styleFrom(
@@ -918,17 +923,17 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
           color: AppTheme.gray100,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Column(
+        child: Column(
           children: [
             Text(
-              'No advice yet',
-              style: TextStyle(
+              tr('No advice yet', 'لا توجد نصائح بعد'),
+              style: const TextStyle(
                   fontWeight: FontWeight.w600, color: AppTheme.teal900),
             ),
-            SizedBox(height: 6),
+            const SizedBox(height: 6),
             Text(
-              'Add a few tips, attach a video, then send to relatives.',
-              style: TextStyle(fontSize: 12, color: AppTheme.gray600),
+              tr('Add a few tips, attach a video, then send to relatives.', 'أضف بعض النصائح، أرفق فيديو، ثم أرسل للأقارب.'),
+              style: const TextStyle(fontSize: 12, color: AppTheme.gray600),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1015,7 +1020,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                                   icon: const Icon(Icons.delete_outline,
                                       color: Colors.red, size: 22),
                                   onPressed: () => _deleteAdvice(a),
-                                  tooltip: 'Delete advice',
+                                  tooltip: tr('Delete advice', 'حذف النصيحة'),
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
                                 ),
@@ -1066,9 +1071,9 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                const Text(
-                                  'Tap to play video',
-                                  style: TextStyle(
+                                Text(
+                                  tr('Tap to play video', 'اضغط لتشغيل الفيديو'),
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
@@ -1115,9 +1120,9 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Tip',
-                                style: TextStyle(
+                              Text(
+                                tr('Tip', 'نصيحة'),
+                                style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: AppTheme.teal600,
@@ -1137,7 +1142,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                                 GestureDetector(
                                   onTap: () => _openAdviceDetails(a),
                                   child: Text(
-                                    'View all ${a.tips.length} tips',
+                                    tr('View all ${a.tips.length} tips', 'عرض جميع النصائح ${a.tips.length}'),
                                     style: const TextStyle(
                                       fontSize: 13,
                                       color: AppTheme.teal600,
@@ -1163,7 +1168,7 @@ class _DoctorAdviceScreenState extends State<DoctorAdviceScreen> {
                 child: OutlinedButton.icon(
                   onPressed: () => _openAdviceDetails(a),
                   icon: const Icon(Icons.info_outline),
-                  label: const Text('View Full Details'),
+                  label: Text(tr('View Full Details', 'عرض التفاصيل الكاملة')),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.teal600,
                     side: const BorderSide(color: AppTheme.teal200),
@@ -1189,6 +1194,11 @@ class _VideoPickerPlaceholder extends StatelessWidget {
 
   const _VideoPickerPlaceholder({required this.onPick});
 
+  String _tr(BuildContext context, String en, String ar) {
+    final isAr = (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+    return isAr ? ar : en;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1201,10 +1211,10 @@ class _VideoPickerPlaceholder extends StatelessWidget {
         children: [
           const Icon(Icons.ondemand_video, size: 48, color: AppTheme.gray500),
           const SizedBox(height: 8),
-          const Text(
-            'Attach a video from your phone (optional)',
+          Text(
+            _tr(context, 'Attach a video from your phone (optional)', 'أرفق فيديو من هاتفك (اختياري)'),
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: AppTheme.teal900),
@@ -1216,7 +1226,7 @@ class _VideoPickerPlaceholder extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: onPick,
               icon: const Icon(Icons.video_library),
-              label: const Text('Choose video'),
+              label: Text(_tr(context, 'Choose video', 'اختر فيديو')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.teal600,
                 foregroundColor: Colors.white,

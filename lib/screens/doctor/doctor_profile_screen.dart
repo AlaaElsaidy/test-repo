@@ -9,6 +9,7 @@ import '../../core/supabase/auth-service.dart';
 import '../../core/supabase/supabase-config.dart';
 import '../../core/supabase/supabase-service.dart';
 import '../../theme/app_theme.dart';
+import '../../main.dart' show appStateInstance;
 
 class DoctorProfileScreen extends StatefulWidget {
   const DoctorProfileScreen({super.key});
@@ -28,6 +29,11 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
 
   File? _avatarFile;
   bool _uploadingPhoto = false;
+
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
 
   @override
   void initState() {
@@ -100,9 +106,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
         _avatarFile = file;
         _profileFuture = _loadProfile();
       });
-      _showSnack('Profile photo updated');
+      _showSnack(tr('Profile photo updated', 'تم تحديث صورة الملف الشخصي'));
     } catch (e) {
-      _showSnack('Failed to upload photo: $e');
+      _showSnack(tr('Failed to upload photo', 'فشل رفع الصورة') + ': $e');
     } finally {
       if (mounted) {
         setState(() => _uploadingPhoto = false);
@@ -123,7 +129,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       }
       if (mounted) Navigator.of(context).maybePop();
     } catch (e) {
-      _showSnack('Image pick error: $e');
+      _showSnack(tr('Image pick error', 'خطأ في اختيار الصورة') + ': $e');
     }
   }
 
@@ -139,12 +145,12 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera),
-              title: const Text('Take a photo'),
+              title: Text(tr('Take a photo', 'التقاط صورة')),
               onTap: () => _pickImage(data, ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from gallery'),
+              title: Text(tr('Choose from gallery', 'اختيار من المعرض')),
               onTap: () => _pickImage(data, ImageSource.gallery),
             ),
             const SizedBox(height: 6),
@@ -179,9 +185,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Edit Profile',
-                style: TextStyle(
+              Text(
+                tr('Edit Profile', 'تعديل الملف الشخصي'),
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.teal900,
@@ -190,38 +196,38 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Full name',
-                  prefixIcon: Icon(Icons.person),
+                decoration: InputDecoration(
+                  labelText: tr('Full name', 'الاسم الكامل'),
+                  prefixIcon: const Icon(Icons.person),
                 ),
                 validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Name is required' : null,
+                    v == null || v.trim().isEmpty ? tr('Name is required', 'الاسم مطلوب') : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: phoneCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Phone number',
-                  prefixIcon: Icon(Icons.phone),
+                decoration: InputDecoration(
+                  labelText: tr('Phone number', 'رقم الهاتف'),
+                  prefixIcon: const Icon(Icons.phone),
                 ),
                 keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: emailCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Email address',
-                  prefixIcon: Icon(Icons.email),
+                decoration: InputDecoration(
+                  labelText: tr('Email address', 'البريد الإلكتروني'),
+                  prefixIcon: const Icon(Icons.email),
                 ),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Email is required';
+                    return tr('Email is required', 'البريد الإلكتروني مطلوب');
                   }
                   final regex = RegExp(
                       r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
                   if (!regex.hasMatch(value.trim())) {
-                    return 'Enter a valid email';
+                    return tr('Enter a valid email', 'أدخل بريدًا إلكترونيًا صحيحًا');
                   }
                   return null;
                 },
@@ -242,16 +248,16 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                       });
                       if (mounted) {
                         Navigator.pop(ctx);
-                        _showSnack('Profile updated');
+                        _showSnack(tr('Profile updated', 'تم تحديث الملف الشخصي'));
                         setState(() {
                           _profileFuture = _loadProfile();
                         });
                       }
                     } catch (e) {
-                      _showSnack('Failed to update: $e');
+                      _showSnack(tr('Failed to update', 'فشل التحديث') + ': $e');
                     }
                   },
-                  child: const Text('Save Changes'),
+                  child: Text(tr('Save Changes', 'حفظ التغييرات')),
                 ),
               ),
             ],
@@ -290,7 +296,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 children: [
                   const Icon(Icons.error_outline, size: 48, color: Colors.red),
                   const SizedBox(height: 8),
-                  const Text('Failed to load profile'),
+                  Text(tr('Failed to load profile', 'فشل تحميل الملف الشخصي')),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
                     onPressed: () {
@@ -299,7 +305,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                       });
                     },
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
+                    label: Text(tr('Retry', 'إعادة المحاولة')),
                   ),
                 ],
               ),
@@ -314,6 +320,25 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                // Language switcher button (top right)
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: Icon(
+                      _isAr ? Icons.language : Icons.translate,
+                      color: AppTheme.teal600,
+                      size: 28,
+                    ),
+                    tooltip: _isAr ? 'English' : 'العربية',
+                    onPressed: () {
+                      if (appStateInstance != null) {
+                        final newLocale = _isAr ? const Locale('en') : const Locale('ar');
+                        appStateInstance!.changeLanguage(newLocale);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
                 // Profile Header
                 Container(
                   padding: const EdgeInsets.all(24),
@@ -387,7 +412,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        data.specialty ?? 'Doctor',
+                        data.specialty ?? tr('Doctor', 'طبيب'),
                         style: const TextStyle(
                           fontSize: 16,
                           color: Color(0xFFCFFAFE),
@@ -434,10 +459,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                'Active Patients',
+                              Text(
+                                tr('Active Patients', 'المرضى النشطين'),
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 12,
                                   color: AppTheme.gray600,
                                 ),
@@ -463,10 +488,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                'Total Cases',
+                              Text(
+                                tr('Total Cases', 'إجمالي الحالات'),
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 12,
                                   color: AppTheme.gray600,
                                 ),
@@ -490,9 +515,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Contact Information',
-                              style: TextStyle(
+                            Text(
+                              tr('Contact Information', 'بيانات التواصل'),
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.teal900,
@@ -500,22 +525,22 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                             ),
                             TextButton(
                               onPressed: () => _openEditContactSheet(data),
-                              child: const Text('Edit'),
+                              child: Text(tr('Edit', 'تعديل')),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
                         _InfoRow(
                           icon: Icons.phone,
-                          label: 'Phone',
-                          value: data.phone ?? 'Add phone number',
+                          label: tr('Phone', 'الهاتف'),
+                          value: data.phone ?? tr('Add phone number', 'إضافة رقم هاتف'),
                           color: AppTheme.teal500,
                         ),
                         const SizedBox(height: 12),
                         _InfoRow(
                           icon: Icons.email,
-                          label: 'Email',
-                          value: data.email ?? 'Add email',
+                          label: tr('Email', 'البريد الإلكتروني'),
+                          value: data.email ?? tr('Add email', 'إضافة بريد إلكتروني'),
                           color: AppTheme.cyan500,
                         ),
                       ],
@@ -531,9 +556,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                   child: ElevatedButton.icon(
                     onPressed: _handleLogout,
                     icon: const Icon(Icons.logout),
-                    label: const Text(
-                      'Logout',
-                      style: TextStyle(
+                    label: Text(
+                      tr('Logout', 'تسجيل الخروج'),
+                      style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -576,7 +601,7 @@ class _DoctorProfileData {
   String? get phone => user?['phone'] as String?;
   String? get specialty => user?['specialty'] as String?;
 
-  String get experienceLabel => 'Experience with Alzheimer\'s care';
+  String get experienceLabel => 'Experience with Alzheimer\'s care'; // TODO: translate if needed
 }
 
 class _InfoRow extends StatelessWidget {

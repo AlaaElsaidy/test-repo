@@ -33,6 +33,11 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
   bool _loading = true;
   String? _error;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   // Week state
   DateTime _weekStart = _startOfWeek(DateTime.now());
   DateTime _selectedDay = DateTime.now();
@@ -64,7 +69,7 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
       final familyUid = SharedPrefsHelper.getString("familyUid") ??
           SharedPrefsHelper.getString("userId");
       if (familyUid == null) {
-        throw Exception('Family member ID not found');
+        throw Exception(tr('Family member ID not found', 'تعذّر العثور على معرف عضو العائلة'));
       }
 
       _familyMemberId = familyUid;
@@ -116,15 +121,15 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
     final res = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: const Text('Are you sure you want to delete this activity?'),
+        title: Text(tr('Confirm Delete', 'تأكيد الحذف')),
+        content: Text(tr('Are you sure you want to delete this activity?', 'هل أنت متأكد أنك تريد حذف هذا النشاط؟')),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+              child: Text(tr('Cancel', 'إلغاء'))),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete', style: TextStyle(color: Colors.red))),
+              child: Text(tr('Delete', 'حذف'), style: const TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -140,13 +145,13 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
       await _refreshActivities();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Activity deleted successfully')),
+          SnackBar(content: Text(tr('Activity deleted successfully', 'تم حذف النشاط بنجاح'))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting activity: $e')),
+          SnackBar(content: Text(tr('Error deleting activity', 'خطأ في حذف النشاط') + ': $e')),
         );
       }
     }
@@ -203,8 +208,8 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
     if (patients.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No patients linked. Please link a patient first.'),
+          SnackBar(
+            content: Text(tr('No patients linked. Please link a patient first.', 'لا يوجد مرضى مرتبطين. يرجى ربط مريض أولاً.')),
           ),
         );
       }
@@ -310,7 +315,7 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Memory Activities',
+                              tr('Memory Activities', 'أنشطة الذاكرة'),
                               style: TextStyle(
                                 fontSize: titleSize,
                                 fontWeight: FontWeight.bold,
@@ -319,7 +324,7 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Keep your mind active and engaged',
+                              tr('Keep your mind active and engaged', 'حافظ على نشاط عقلك وانشغاله'),
                               style: TextStyle(
                                 fontSize: subtitleSize,
                                 color: kGray600,
@@ -359,8 +364,8 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const TabBar(
-                      indicator: BoxDecoration(
+                    child: TabBar(
+                      indicator: const BoxDecoration(
                         gradient: kTealGradient,
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
@@ -368,8 +373,8 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                       labelColor: Colors.white,
                       unselectedLabelColor: kGray600,
                       tabs: [
-                        Tab(text: 'Today'),
-                        Tab(text: 'Schedule'),
+                        Tab(text: _isAr ? 'اليوم' : 'Today'),
+                        Tab(text: _isAr ? 'الجدول' : 'Schedule'),
                       ],
                     ),
                   ),
@@ -552,9 +557,8 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
 
   Widget _buildFamilyList(List<Map<String, dynamic>> list) {
     if (list.isEmpty) {
-      return const Center(
-          child:
-              Text('No activities found.', style: TextStyle(color: kGray600)));
+        return Center(
+          child: Text(tr('No activities found.', 'لم يتم العثور على أنشطة.'), style: const TextStyle(color: kGray600)));
     }
     return ListView.builder(
       itemCount: list.length,
@@ -599,14 +603,14 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                         _deleteActivity(activity);
                       }
                     },
-                    itemBuilder: (context) => const [
+                    itemBuilder: (context) => [
                       PopupMenuItem(
                         value: 'edit',
                         child: Row(
                           children: [
-                            Icon(Icons.edit, size: 18),
-                            SizedBox(width: 8),
-                            Text('Edit'),
+                            const Icon(Icons.edit, size: 18),
+                            const SizedBox(width: 8),
+                            Text(tr('Edit', 'تعديل')),
                           ],
                         ),
                       ),
@@ -614,9 +618,9 @@ class _FamilyActivitiesScreenState extends State<FamilyActivitiesScreen> {
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete, size: 18, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete'),
+                            const Icon(Icons.delete, size: 18, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Text(tr('Delete', 'حذف')),
                           ],
                         ),
                       ),
@@ -656,6 +660,12 @@ class _ProgressCard extends StatelessWidget {
   const _ProgressCard(
       {required this.done, required this.total, required this.progress});
 
+  bool _isAr(BuildContext context) =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(BuildContext context, String en, String ar) =>
+      _isAr(context) ? ar : en;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -664,10 +674,10 @@ class _ProgressCard extends StatelessWidget {
           gradient: kTealGradient, borderRadius: BorderRadius.circular(16)),
       child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-            Text('Today\'s Progress',
-                style: TextStyle(color: Color(0xFFCFFAFE), fontSize: 14)),
-            SizedBox(height: 4),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tr(context, 'Today\'s Progress', 'تقدم اليوم'),
+                style: const TextStyle(color: Color(0xFFCFFAFE), fontSize: 14)),
+            const SizedBox(height: 4),
           ]),
           Container(
             width: 64,
@@ -679,7 +689,7 @@ class _ProgressCard extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 8),
-        Text('$done/$total Activities',
+        Text(tr(context, '$done/$total Activities', '$done/$total أنشطة'),
             style: const TextStyle(
                 color: Colors.white,
                 fontSize: 24,
@@ -695,8 +705,8 @@ class _ProgressCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        const Text('Great job! Keep going! 💪',
-            style: TextStyle(color: Color(0xFFCFFAFE), fontSize: 14)),
+        Text(tr(context, 'Great job! Keep going! 💪', 'عمل رائع! استمر! 💪'),
+            style: const TextStyle(color: Color(0xFFCFFAFE), fontSize: 14)),
       ]),
     );
   }
@@ -801,6 +811,11 @@ class _EditActivitiesViewState extends State<EditActivitiesView> {
   String? _selectedPatientId;
   bool _saving = false;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -870,19 +885,19 @@ class _EditActivitiesViewState extends State<EditActivitiesView> {
   Future<void> _save() async {
     if (_nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter activity name')));
+          SnackBar(content: Text(tr('Please enter activity name', 'يرجى إدخال اسم النشاط'))));
       return;
     }
 
     if (_selectedPatientId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a patient')));
+          SnackBar(content: Text(tr('Please select a patient', 'يرجى اختيار مريض'))));
       return;
     }
 
     if (widget.familyMemberId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Family member ID not found')));
+          SnackBar(content: Text(tr('Family member ID not found', 'تعذّر العثور على معرف عضو العائلة'))));
       return;
     }
 
@@ -925,7 +940,7 @@ class _EditActivitiesViewState extends State<EditActivitiesView> {
       setState(() => _saving = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving activity: $e')),
+          SnackBar(content: Text(tr('Error saving activity', 'خطأ في حفظ النشاط') + ': $e')),
         );
       }
     }
@@ -939,7 +954,7 @@ class _EditActivitiesViewState extends State<EditActivitiesView> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-            widget.activity == null ? 'Add Activity' : 'Edit Activity',
+            widget.activity == null ? tr('Add Activity', 'إضافة نشاط') : tr('Edit Activity', 'تعديل النشاط'),
             style:
                 const TextStyle(color: kTeal500, fontWeight: FontWeight.bold)),
         centerTitle: true,
@@ -954,19 +969,19 @@ class _EditActivitiesViewState extends State<EditActivitiesView> {
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // Patient selection (only for new activities)
             if (widget.activity == null && widget.patients.isNotEmpty) ...[
-              const Text('Select Patient',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(tr('Select Patient', 'اختر مريض'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: _selectedPatientId,
-                decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Patient'),
+                decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    labelText: tr('Patient', 'مريض')),
                 items: widget.patients.map((p) {
                   final patient = p['patients'] as Map<String, dynamic>?;
                   final patientId = patient?['id'] as String? ??
                       p['patient_id'] as String?;
-                  final patientName = patient?['name'] as String? ?? 'Unknown';
+                  final patientName = patient?['name'] as String? ?? tr('Unknown', 'غير معروف');
                   return DropdownMenuItem(
                     value: patientId,
                     child: Text(patientName),
@@ -980,41 +995,41 @@ class _EditActivitiesViewState extends State<EditActivitiesView> {
             ],
             TextField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Activity Name', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: tr('Activity Name', 'اسم النشاط'), border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _descCtrl,
               maxLines: 2,
-              decoration: const InputDecoration(
-                  labelText: 'Description', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: tr('Description', 'الوصف'), border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             ListTile(
-              title: Text('Time: ${_selectedTime.format(context)}'),
+              title: Text(tr('Time: ${_selectedTime.format(context)}', 'الوقت: ${_selectedTime.format(context)}')),
               trailing: const Icon(Icons.access_time),
               onTap: _pickTime,
             ),
             ListTile(
               title: Text(_selectedDate != null
-                  ? 'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate!)}'
-                  : 'Select Date'),
+                  ? tr('Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate!)}', 'التاريخ: ${DateFormat('yyyy-MM-dd').format(_selectedDate!)}')
+                  : tr('Select Date', 'اختر التاريخ')),
               trailing: const Icon(Icons.calendar_today),
               onTap: _pickDate,
             ),
-            const Text('Reminder type',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(tr('Reminder type', 'نوع التذكير'),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             Row(children: [
               _ReminderChip(
-                  label: 'Alarm',
+                  label: tr('Alarm', 'منبه'),
                   icon: Icons.alarm,
                   selected: _reminderType == 'alarm',
                   onTap: () => setState(() => _reminderType = 'alarm')),
               const SizedBox(width: 12),
               _ReminderChip(
-                  label: 'Vibrate',
+                  label: tr('Vibrate', 'اهتزاز'),
                   icon: Icons.notifications_active,
                   selected: _reminderType == 'vibrate',
                   onTap: () => setState(() => _reminderType = 'vibrate')),

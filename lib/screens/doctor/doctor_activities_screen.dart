@@ -389,6 +389,11 @@ class _QuestionDialogState extends State<_QuestionDialog> {
   final _opt3 = TextEditingController();
   int _correct = 0;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -425,7 +430,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
   Widget build(BuildContext context) {
     final isEdit = widget.initial != null;
     return AlertDialog(
-      title: Text(isEdit ? 'Edit question' : 'Add question'),
+      title: Text(isEdit ? tr('Edit question', 'تعديل السؤال') : tr('Add question', 'إضافة سؤال')),
       content: Form(
         key: _form,
         child: SingleChildScrollView(
@@ -434,9 +439,9 @@ class _QuestionDialogState extends State<_QuestionDialog> {
             children: [
               TextFormField(
                 controller: _prompt,
-                decoration: const InputDecoration(labelText: 'Question prompt'),
+                decoration: InputDecoration(labelText: tr('Question prompt', 'نص السؤال')),
                 validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    (v == null || v.trim().isEmpty) ? tr('Required', 'مطلوب') : null,
               ),
               const SizedBox(height: 8),
               for (int i = 0; i < 3; i++)
@@ -451,9 +456,9 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                       child: TextFormField(
                         controller: [_opt1, _opt2, _opt3][i],
                         decoration:
-                            InputDecoration(labelText: 'Option ${i + 1}'),
+                            InputDecoration(labelText: tr('Option', 'خيار') + ' ${i + 1}'),
                         validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Required' : null,
+                            (v == null || v.trim().isEmpty) ? tr('Required', 'مطلوب') : null,
                       ),
                     ),
                   ],
@@ -465,8 +470,8 @@ class _QuestionDialogState extends State<_QuestionDialog> {
       actions: [
         TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel')),
-        ElevatedButton(onPressed: _save, child: Text(isEdit ? 'Save' : 'Add')),
+            child: Text(tr('Cancel', 'إلغاء'))),
+        ElevatedButton(onPressed: _save, child: Text(isEdit ? tr('Save', 'حفظ') : tr('Add', 'إضافة'))),
       ],
     );
   }
@@ -478,6 +483,11 @@ class _QuestionDialogState extends State<_QuestionDialog> {
 class DoctorActivitiesScreen extends StatelessWidget {
   const DoctorActivitiesScreen({super.key});
 
+  String _tr(BuildContext context, String en, String ar) {
+    final isAr = (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+    return isAr ? ar : en;
+  }
+
   @override
   Widget build(BuildContext context) {
     final faces = ActivityRepository.demoFaces();
@@ -485,7 +495,7 @@ class DoctorActivitiesScreen extends StatelessWidget {
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Doctor — Edit Activities'),
+          title: Text(_tr(context, 'Doctor — Edit Activities', 'الطبيب — تعديل الأنشطة')),
           backgroundColor: AppTheme.teal600,
           foregroundColor: Colors.white,
         ),
@@ -493,15 +503,15 @@ class DoctorActivitiesScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Editable Activities',
-                style: TextStyle(
+            Text(_tr(context, 'Editable Activities', 'الأنشطة القابلة للتعديل'),
+                style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.teal900)),
             const SizedBox(height: 12),
             _ActivityCard(
-              title: 'Face Recognition (Edit)',
-              description: 'Change image, edit question, options, and hints',
+              title: _tr(context, 'Face Recognition (Edit)', 'التعرف على الوجوه (تعديل)'),
+              description: _tr(context, 'Change image, edit question, options, and hints', 'تغيير الصورة، تعديل السؤال، الخيارات، والتلميحات'),
               icon: Icons.face_retouching_natural,
               color: Colors.green,
               onTap: () {
@@ -515,8 +525,8 @@ class DoctorActivitiesScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _ActivityCard(
-              title: 'Photo Memory (Edit)',
-              description: 'Change photo and edit questions/options',
+              title: _tr(context, 'Photo Memory (Edit)', 'ذاكرة الصور (تعديل)'),
+              description: _tr(context, 'Change photo and edit questions/options', 'تغيير الصورة وتعديل الأسئلة/الخيارات'),
               icon: Icons.photo_library,
               color: Colors.orange,
               onTap: () {
@@ -530,8 +540,8 @@ class DoctorActivitiesScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _ActivityCard(
-              title: 'To‑Do (Schedule)',
-              description: 'Plan daily activities with reminders',
+              title: _tr(context, 'To‑Do (Schedule)', 'قائمة المهام (جدولة)'),
+              description: _tr(context, 'Plan daily activities with reminders', 'تخطيط الأنشطة اليومية مع التذكيرات'),
               icon: Icons.schedule,
               color: AppTheme.teal600,
               onTap: () {
@@ -635,6 +645,11 @@ class _EditableFaceRecognitionScreenState
   Map<String, FaceEdit> _edits = {};
   bool _loaded = false;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -687,11 +702,11 @@ class _EditableFaceRecognitionScreenState
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(
               leading: const Icon(Icons.photo_camera),
-              title: const Text('Camera'),
+              title: Text(tr('Camera', 'الكاميرا')),
               onTap: () => Navigator.pop(context, ImageSource.camera)),
           ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
+              title: Text(tr('Gallery', 'المعرض')),
               onTap: () => Navigator.pop(context, ImageSource.gallery)),
         ]),
       ),
@@ -740,7 +755,7 @@ class _EditableFaceRecognitionScreenState
     await _DoctorEditStore.saveFace(_edits);
     if (mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Saved changes')));
+          .showSnackBar(SnackBar(content: Text(tr('Saved changes', 'تم حفظ التغييرات'))));
     }
   }
 
@@ -779,7 +794,7 @@ class _EditableFaceRecognitionScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Face Recognition (Edit)'),
+        title: Text(tr('Face Recognition (Edit)', 'التعرف على الوجوه (تعديل)')),
         backgroundColor: AppTheme.teal600,
         foregroundColor: Colors.white,
       ),
@@ -796,12 +811,12 @@ class _EditableFaceRecognitionScreenState
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Item ${_index + 1}/${_faces.length}',
+                          Text(tr('Item', 'عنصر') + ' ${_index + 1}/${_faces.length}',
                               style: const TextStyle(
                                   color: AppTheme.teal900,
                                   fontWeight: FontWeight.w600)),
-                          const Text('Edit mode',
-                              style: TextStyle(color: AppTheme.gray600)),
+                          Text(tr('Edit mode', 'وضع التعديل'),
+                              style: const TextStyle(color: AppTheme.gray600)),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -849,19 +864,19 @@ class _EditableFaceRecognitionScreenState
                       const SizedBox(height: 10),
 
                       // Hints config
-                      const Text('Hints',
-                          style: TextStyle(
+                      Text(tr('Hints', 'التلميحات'),
+                          style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               color: AppTheme.teal900)),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Show relation as hint'),
+                        title: Text(tr('Show relation as hint', 'إظهار العلاقة كتلميح')),
                         value: _hintRelation,
                         onChanged: (v) => setState(() => _hintRelation = v),
                       ),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Show first letter of name'),
+                        title: Text(tr('Show first letter of name', 'إظهار الحرف الأول من الاسم')),
                         value: _hintFirstLetter,
                         onChanged: (v) => setState(() => _hintFirstLetter = v),
                       ),
@@ -873,8 +888,8 @@ class _EditableFaceRecognitionScreenState
                               color: AppTheme.teal50,
                               borderRadius: BorderRadius.circular(12)),
                           child: Text(
-                            'Hint: ${_hintRelation ? current.relation : '-'}'
-                            ' • ${_hintFirstLetter ? 'Name starts with "${current.name[0]}"' : ''}',
+                            tr('Hint', 'تلميح') + ': ${_hintRelation ? current.relation : '-'}'
+                            ' • ${_hintFirstLetter ? tr('Name starts with', 'الاسم يبدأ بـ') + ' "${current.name[0]}"' : ''}',
                             style: const TextStyle(color: AppTheme.teal900),
                           ),
                         ),
@@ -895,13 +910,13 @@ class _EditableFaceRecognitionScreenState
                           TextButton.icon(
                             onPressed: _editPromptAndOptions,
                             icon: const Icon(Icons.edit),
-                            label: const Text('Edit Q/Options'),
+                            label: Text(tr('Edit Q/Options', 'تعديل السؤال/الخيارات')),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       // Correct answer label
-                      Text('Correct answer: $correctText',
+                      Text(tr('Correct answer', 'الإجابة الصحيحة') + ': $correctText',
                           style: const TextStyle(color: AppTheme.gray600)),
                       const SizedBox(height: 8),
 
@@ -930,18 +945,18 @@ class _EditableFaceRecognitionScreenState
                     OutlinedButton.icon(
                       onPressed: () => setState(() => _hintShown = !_hintShown),
                       icon: const Icon(Icons.lightbulb),
-                      label: const Text('Hint'),
+                      label: Text(tr('Hint', 'تلميح')),
                     ),
                     const SizedBox(width: 8),
                     TextButton(
                       onPressed: _saveCurrent, // Save instead of Skip
-                      child: const Text('Save'),
+                      child: Text(tr('Save', 'حفظ')),
                     ),
                     const Spacer(),
                     ElevatedButton.icon(
                       onPressed: _next,
                       icon: const Icon(Icons.arrow_forward),
-                      label: const Text('Next'),
+                      label: Text(tr('Next', 'التالي')),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.teal600,
                         foregroundColor: Colors.white,
@@ -984,6 +999,11 @@ class _EditablePhotoMemoryScreenState extends State<EditablePhotoMemoryScreen> {
 
   Map<String, PhotoEdit> _edits = {};
   bool _loaded = false;
+
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
 
   @override
   void initState() {
@@ -1121,11 +1141,11 @@ class _EditablePhotoMemoryScreenState extends State<EditablePhotoMemoryScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(
               leading: const Icon(Icons.photo_camera),
-              title: const Text('Camera'),
+              title: Text(tr('Camera', 'الكاميرا')),
               onTap: () => Navigator.pop(context, ImageSource.camera)),
           ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
+              title: Text(tr('Gallery', 'المعرض')),
               onTap: () => Navigator.pop(context, ImageSource.gallery)),
         ]),
       ),
@@ -1153,7 +1173,7 @@ class _EditablePhotoMemoryScreenState extends State<EditablePhotoMemoryScreen> {
     await _DoctorEditStore.savePhoto(_edits);
     if (mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Saved changes')));
+          .showSnackBar(SnackBar(content: Text(tr('Saved changes', 'تم حفظ التغييرات'))));
     }
   }
 
@@ -1179,7 +1199,7 @@ class _EditablePhotoMemoryScreenState extends State<EditablePhotoMemoryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Photo Memory (Edit)'),
+        title: Text(tr('Photo Memory (Edit)', 'ذاكرة الصور (تعديل)')),
         backgroundColor: AppTheme.teal600,
         foregroundColor: Colors.white,
       ),
@@ -1197,12 +1217,12 @@ class _EditablePhotoMemoryScreenState extends State<EditablePhotoMemoryScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Photo ${_photoIdx + 1}/${_photos.length}',
+                          Text(tr('Photo', 'صورة') + ' ${_photoIdx + 1}/${_photos.length}',
                               style: const TextStyle(
                                   color: AppTheme.teal900,
                                   fontWeight: FontWeight.w600)),
-                          const Text('Edit mode',
-                              style: TextStyle(color: AppTheme.gray600)),
+                          Text(tr('Edit mode', 'وضع التعديل'),
+                              style: const TextStyle(color: AppTheme.gray600)),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -1241,7 +1261,7 @@ class _EditablePhotoMemoryScreenState extends State<EditablePhotoMemoryScreen> {
                               ),
                               onPressed: _pickImage,
                               icon: const Icon(Icons.edit),
-                              label: const Text('Change'),
+                              label: Text(tr('Change', 'تغيير')),
                             ),
                           ),
                         ],
@@ -1263,13 +1283,13 @@ class _EditablePhotoMemoryScreenState extends State<EditablePhotoMemoryScreen> {
                           TextButton.icon(
                             onPressed: _editCurrentQuestion,
                             icon: const Icon(Icons.edit),
-                            label: const Text('Edit Q/Options'),
+                            label: Text(tr('Edit Q/Options', 'تعديل السؤال/الخيارات')),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       // Correct answer label
-                      Text('Correct answer: $correctText',
+                      Text(tr('Correct answer', 'الإجابة الصحيحة') + ': $correctText',
                           style: const TextStyle(color: AppTheme.gray600)),
                       const SizedBox(height: 8),
 
@@ -1297,12 +1317,12 @@ class _EditablePhotoMemoryScreenState extends State<EditablePhotoMemoryScreen> {
                   children: [
                     TextButton(
                         onPressed: _saveCurrentPhotoEdits,
-                        child: const Text('Save')),
+                        child: Text(tr('Save', 'حفظ'))),
                     const Spacer(),
                     ElevatedButton.icon(
                       onPressed: _next,
                       icon: const Icon(Icons.arrow_forward),
-                      label: const Text('Next'),
+                      label: Text(tr('Next', 'التالي')),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.teal600,
                         foregroundColor: Colors.white,
@@ -1468,6 +1488,11 @@ class _TodoScheduleScreenState extends State<TodoScheduleScreen>
   late TabController _tab;
   List<TodoTask> _tasks = [];
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -1548,14 +1573,14 @@ class _TodoScheduleScreenState extends State<TodoScheduleScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('To‑Do Schedule'),
+        title: Text(tr('To‑Do Schedule', 'جدولة المهام')),
         backgroundColor: AppTheme.teal600,
         foregroundColor: Colors.white,
         bottom: TabBar(
           controller: _tab,
-          tabs: const [
-            Tab(text: 'Today'),
-            Tab(text: 'Schedule'),
+          tabs: [
+            Tab(text: tr('Today', 'اليوم')),
+            Tab(text: tr('Schedule', 'الجدول')),
           ],
         ),
       ),
@@ -1564,14 +1589,14 @@ class _TodoScheduleScreenState extends State<TodoScheduleScreen>
         children: [
           _TaskList(
             tasks: _today,
-            emptyText: 'No activities scheduled for today.',
+            emptyText: tr('No activities scheduled for today.', 'لا توجد أنشطة مجدولة لليوم.'),
             onToggle: _toggleDone,
             onEdit: (t) => _addOrEdit(original: t),
             onDelete: _delete,
           ),
           _TaskList(
             tasks: all,
-            emptyText: 'No scheduled activities yet.',
+            emptyText: tr('No scheduled activities yet.', 'لا توجد أنشطة مجدولة بعد.'),
             onToggle: _toggleDone,
             onEdit: (t) => _addOrEdit(original: t),
             onDelete: _delete,
@@ -1583,7 +1608,7 @@ class _TodoScheduleScreenState extends State<TodoScheduleScreen>
         backgroundColor: AppTheme.teal600,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
-        label: const Text('Add'),
+        label: Text(tr('Add', 'إضافة')),
       ),
     );
   }
@@ -1603,6 +1628,11 @@ class _TaskList extends StatelessWidget {
     required this.onDelete,
     required this.onEdit,
   });
+
+  String _tr(BuildContext context, String en, String ar) {
+    final isAr = (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+    return isAr ? ar : en;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1675,19 +1705,19 @@ class _TaskList extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               IconButton(
-                tooltip: t.done ? 'Mark as not done' : 'Mark as done',
+                tooltip: t.done ? _tr(context, 'Mark as not done', 'تحديد كغير مكتمل') : _tr(context, 'Mark as done', 'تحديد كمكتمل'),
                 onPressed: () => onToggle(t),
                 icon: Icon(
                     t.done ? Icons.check_circle : Icons.radio_button_unchecked,
                     color: t.done ? Colors.green : AppTheme.gray500),
               ),
               IconButton(
-                tooltip: 'Edit',
+                tooltip: _tr(context, 'Edit', 'تعديل'),
                 onPressed: () => onEdit(t),
                 icon: const Icon(Icons.edit, color: AppTheme.gray500),
               ),
               IconButton(
-                tooltip: 'Delete',
+                tooltip: _tr(context, 'Delete', 'حذف'),
                 onPressed: () => onDelete(t),
                 icon: const Icon(Icons.delete_outline, color: Colors.red),
               ),
@@ -1714,6 +1744,11 @@ class _TaskEditorSheetState extends State<_TaskEditorSheet> {
   late TextEditingController _desc;
   late DateTime _date;
   late TimeOfDay _time;
+
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
 
   @override
   void initState() {
@@ -1793,27 +1828,27 @@ class _TaskEditorSheetState extends State<_TaskEditorSheet> {
                         color: Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(2))),
                 const SizedBox(height: 12),
-                const Text('Add / Edit Activity',
+                Text(tr('Add / Edit Activity', 'إضافة / تعديل نشاط'),
                     style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                        const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _title,
-                  decoration: const InputDecoration(
-                    labelText: 'Activity title',
-                    prefixIcon: Icon(Icons.edit),
+                  decoration: InputDecoration(
+                    labelText: tr('Activity title', 'عنوان النشاط'),
+                    prefixIcon: const Icon(Icons.edit),
                     filled: true,
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Title is required'
+                      ? tr('Title is required', 'العنوان مطلوب')
                       : null,
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: _desc,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (optional)',
-                    prefixIcon: Icon(Icons.notes),
+                  decoration: InputDecoration(
+                    labelText: tr('Description (optional)', 'الوصف (اختياري)'),
+                    prefixIcon: const Icon(Icons.notes),
                     filled: true,
                   ),
                   maxLines: 2,
@@ -1845,7 +1880,7 @@ class _TaskEditorSheetState extends State<_TaskEditorSheet> {
                   child: ElevatedButton.icon(
                     onPressed: _save,
                     icon: const Icon(Icons.save),
-                    label: const Text('Save'),
+                    label: Text(tr('Save', 'حفظ')),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.teal600,
                       foregroundColor: Colors.white,

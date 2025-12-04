@@ -31,6 +31,11 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
   bool _cardComplete = false;
   bool _saveCard = true;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -90,14 +95,14 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
                   if (state is PaymentError) {
                     showErrorDialog(
                         context: context,
-                        title: 'Payment Failed',
+                        title: tr('Payment Failed', 'فشل الدفع'),
                         error: state.message);
                   }
                   if (state is PaymentSuccess) {
                     showSuccessDialog(
-                        title: 'Payment Successful!',
+                        title: tr('Payment Successful!', 'تم الدفع بنجاح!'),
                         description:
-                            'You have successfully paid \$${state.amount}',
+                            tr('You have successfully paid \$${state.amount}', 'لقد دفعت بنجاح \$${state.amount}'),
                         context: context,
                         onClick: () {
                           Navigator.pushNamedAndRemoveUntil(
@@ -125,7 +130,7 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Text(
-                              "Payment Details",
+                              tr("Payment Details", "تفاصيل الدفع"),
                               style: TextStyle(
                                 color: const Color(0xFF0E3E3B),
                                 fontSize: context.sp(26),
@@ -134,7 +139,7 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
                             ),
                             SizedBox(height: context.h(6)),
                             Text(
-                              "Enter your card information to proceed",
+                              tr("Enter your card information to proceed", "أدخل معلومات بطاقتك للمتابعة"),
                               style: TextStyle(
                                 color: const Color(0xFF7EA9A3),
                                 fontWeight: FontWeight.w600,
@@ -145,7 +150,7 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
                             CardPreview(
                               masked: _maskedNumber,
                               holder: _nameController.text.isEmpty
-                                  ? "Cardholder"
+                                  ? tr("Cardholder", "حامل البطاقة")
                                   : _nameController.text,
                               expiry: _expiryFromForm,
                             ),
@@ -176,19 +181,19 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
                                     final cardHolder =
                                         _nameController.text.trim();
                                     if (!_cardComplete) {
-                                      showErrorDialog(
-                                          title: 'Payment Failed',
-                                          context: context,
-                                          error:
-                                              'Please enter complete card details.');
+                    showErrorDialog(
+                        title: tr('Payment Failed', 'فشل الدفع'),
+                        context: context,
+                        error:
+                            tr('Please enter complete card details.', 'يرجى إدخال تفاصيل البطاقة كاملة.'));
                                       return;
                                     }
                                     if (cardHolder.isEmpty) {
-                                      showErrorDialog(
-                                          context: context,
-                                          title: 'Payment Failed',
-                                          error:
-                                              'Please enter the cardholder name.');
+                    showErrorDialog(
+                        context: context,
+                        title: tr('Payment Failed', 'فشل الدفع'),
+                        error:
+                            tr('Please enter the cardholder name.', 'يرجى إدخال اسم حامل البطاقة.'));
                                       return;
                                     }
                                     context.read<PaymentCubit>().pay(
@@ -197,7 +202,7 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
                                           saveCard: _saveCard,
                                         );
                                   },
-                                  text: isLoading ? "Loading..." : "Pay Now"),
+                                  text: isLoading ? tr("Loading...", "جاري التحميل...") : tr("Pay Now", "ادفع الآن")),
                             ),
                           ],
                         ),

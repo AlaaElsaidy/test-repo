@@ -19,6 +19,11 @@ class _LobnaChatScreenState extends State<LobnaChatScreen> {
   final List<ChatMessage> _messages = [];
   bool _isSending = false;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -29,7 +34,10 @@ class _LobnaChatScreenState extends State<LobnaChatScreen> {
     // Add welcome message
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _addMessage(ChatMessage(
-        text: 'مرحباً! أنا لبنى، مساعدتك الذكي. كيف يمكنني مساعدتك اليوم؟',
+        text: tr(
+          'Hello! I\'m Lobna, your smart assistant. How can I help you today?',
+          'مرحباً! أنا لبنى، مساعدتك الذكي. كيف يمكنني مساعدتك اليوم؟',
+        ),
         isFromUser: false,
         timestamp: DateTime.now(),
       ));
@@ -69,7 +77,10 @@ class _LobnaChatScreenState extends State<LobnaChatScreen> {
       } else {
         debugPrint('AI response is empty');
         _addMessage(ChatMessage(
-          text: 'عذراً، لم أتمكن من الحصول على رد. يرجى المحاولة مرة أخرى.',
+          text: tr(
+            'Sorry, I couldn\'t get a response. Please try again.',
+            'عذراً، لم أتمكن من الحصول على رد. يرجى المحاولة مرة أخرى.',
+          ),
           isFromUser: false,
           timestamp: DateTime.now(),
         ));
@@ -78,7 +89,10 @@ class _LobnaChatScreenState extends State<LobnaChatScreen> {
       debugPrint('Error sending message: $e');
       debugPrint('Stack trace: $stackTrace');
       _addMessage(ChatMessage(
-        text: 'عذراً، حدث خطأ في الاتصال. يرجى التحقق من الإنترنت والمحاولة مرة أخرى.',
+        text: tr(
+          'Sorry, a connection error occurred. Please check your internet connection and try again.',
+          'عذراً، حدث خطأ في الاتصال. يرجى التحقق من الإنترنت والمحاولة مرة أخرى.',
+        ),
         isFromUser: false,
         timestamp: DateTime.now(),
       ));
@@ -132,21 +146,21 @@ class _LobnaChatScreenState extends State<LobnaChatScreen> {
               child: const Icon(Icons.chat_bubble_rounded, color: Colors.white),
             ),
             const SizedBox(width: 12),
-            const Column(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'لبنى',
-                  style: TextStyle(
+                  'Lobna',
+                  style: const TextStyle(
                     fontSize: 16,
                     color: Colors.black,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  'المساعد الصوتي',
-                  style: TextStyle(
+                  tr('Voice Assistant', 'المساعد الصوتي'),
+                  style: const TextStyle(
                     fontSize: 12,
                     color: AppTheme.gray500,
                   ),
@@ -176,9 +190,9 @@ class _LobnaChatScreenState extends State<LobnaChatScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    'جاري المعالجة...',
-                    style: TextStyle(
+                  Text(
+                    tr('Processing...', 'جاري المعالجة...'),
+                    style: const TextStyle(
                       color: AppTheme.cyan600,
                       fontSize: 14,
                     ),
@@ -216,18 +230,18 @@ class _LobnaChatScreenState extends State<LobnaChatScreen> {
                             ),
                           ),
                           const SizedBox(height: 24),
-                          const Text(
-                            'مرحباً! أنا لبنى',
-                            style: TextStyle(
+                          Text(
+                            tr('Hello! I\'m Lobna', 'مرحباً! أنا لبنى'),
+                            style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: AppTheme.teal900,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            'كيف يمكنني مساعدتك اليوم؟',
-                            style: TextStyle(
+                          Text(
+                            tr('How can I help you today?', 'كيف يمكنني مساعدتك اليوم؟'),
+                            style: const TextStyle(
                               fontSize: 14,
                               color: AppTheme.gray600,
                             ),
@@ -273,10 +287,10 @@ class _LobnaChatScreenState extends State<LobnaChatScreen> {
                       ),
                       child: TextField(
                         controller: _messageController,
-                        decoration: const InputDecoration(
-                          hintText: 'اكتب رسالتك...',
+                        decoration: InputDecoration(
+                          hintText: tr('Type your message...', 'اكتب رسالتك...'),
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         onSubmitted: (_) => _sendMessage(),
                       ),
@@ -410,11 +424,17 @@ class _LobnaChatScreenState extends State<LobnaChatScreen> {
     final diff = now.difference(timestamp);
 
     if (diff.inMinutes < 1) {
-      return 'الآن';
+      return tr('Just now', 'الآن');
     } else if (diff.inHours < 1) {
-      return 'منذ ${diff.inMinutes} دقيقة';
+      return tr(
+        '${diff.inMinutes} min ago',
+        'منذ ${diff.inMinutes} دقيقة',
+      );
     } else if (diff.inDays < 1) {
-      return 'منذ ${diff.inHours} ساعة';
+      return tr(
+        '${diff.inHours} hour ago',
+        'منذ ${diff.inHours} ساعة',
+      );
     } else {
       return '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
     }

@@ -129,6 +129,9 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAr =
+        (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+    String tr(String en, String ar) => isAr ? ar : en;
     final textScale = MediaQuery.of(context).textScaleFactor.clamp(0.8, 1.2);
 
     return Scaffold(
@@ -159,7 +162,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
                     context,
                     0,
                     Icons.dashboard,
-                    'Dashboard',
+                    tr('Dashboard', 'الرئيسية'),
                     textScale,
                   ),
                 ),
@@ -168,7 +171,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
                     context,
                     1,
                     Icons.article,
-                    'Advice',
+                    tr('Advice', 'نصائح'),
                     textScale,
                   ),
                 ),
@@ -177,7 +180,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
                     context,
                     2,
                     Icons.chat,
-                    'Chat',
+                    tr('Chat', 'المحادثات'),
                     textScale,
                   ),
                 ),
@@ -186,7 +189,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
                     context,
                     3,
                     Icons.person,
-                    'Profile',
+                    tr('Profile', 'الملف الشخصي'),
                     textScale,
                   ),
                 ),

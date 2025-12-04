@@ -4,14 +4,18 @@ import 'package:flutter/material.dart';
 import '../../../../../config/utilis/app_colors.dart';
 
 Widget buildSignInLink(BuildContext context) {
+  final isAr =
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+  String tr(String en, String ar) => isAr ? ar : en;
+
   return Center(
     child: RichText(
       text: TextSpan(
         style: TextStyle(fontFamily: 'Open Sans', fontSize: context.sp(16)),
         children: [
-          const TextSpan(
-            text: "Already have an account? ",
-            style: TextStyle(
+          TextSpan(
+            text: tr('Already have an account? ', 'هل لديك حساب بالفعل؟ '),
+            style: const TextStyle(
               fontWeight: FontWeight.w600,
               color: AppColors.lightGray,
             ),
@@ -22,7 +26,7 @@ Widget buildSignInLink(BuildContext context) {
                 Navigator.pop(context);
               },
               child: Text(
-                'Sign in',
+                tr('Sign in', 'تسجيل الدخول'),
                 style: TextStyle(
                   fontFamily: 'Open Sans',
                   fontWeight: FontWeight.bold,

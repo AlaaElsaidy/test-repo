@@ -15,6 +15,12 @@ import 'family_notifications_screen.dart';
 class FamilyDashboard extends StatelessWidget {
   const FamilyDashboard({super.key});
 
+  bool _isAr(BuildContext context) =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(BuildContext context, String en, String ar) =>
+      _isAr(context) ? ar : en;
+
   Future<Map<String, dynamic>?> _loadUserInfo() async {
     try {
       final userId = SharedPrefsHelper.getString("userId") ??
@@ -114,14 +120,14 @@ class FamilyDashboard extends StatelessWidget {
     final uri = Uri.tryParse(url);
     if (uri == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid video link')),
+        SnackBar(content: Text(tr(context, 'Invalid video link', 'رابط الفيديو غير صحيح'))),
       );
       return;
     }
 
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open video')),
+        SnackBar(content: Text(tr(context, 'Could not open video', 'تعذّر فتح الفيديو'))),
       );
     }
   }
@@ -183,7 +189,7 @@ class FamilyDashboard extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Hello, $userName',
+                                      tr(context, 'Hello, $userName', 'مرحباً، $userName'),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 24,
@@ -193,8 +199,8 @@ class FamilyDashboard extends StatelessWidget {
                                     const SizedBox(height: 4),
                                     Text(
                                       patientName != null
-                                          ? 'Caring for $patientName'
-                                          : 'No patients linked yet',
+                                          ? tr(context, 'Caring for $patientName', 'رعاية $patientName')
+                                          : tr(context, 'No patients linked yet', 'لا يوجد مرضى مرتبطين بعد'),
                                       style: const TextStyle(
                                         color: Color(0xFFCFFAFE),
                                         fontSize: 16,
@@ -230,9 +236,9 @@ class FamilyDashboard extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              const Text(
-                                'Everything is going well today',
-                                style: TextStyle(
+                              Text(
+                                tr(context, 'Everything is going well today', 'كل شيء يسير على ما يرام اليوم'),
+                                style: const TextStyle(
                                   color: Color(0xFFCFFAFE),
                                   fontSize: 14,
                                 ),
@@ -271,9 +277,9 @@ class FamilyDashboard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
-                          'Linked Patients',
-                          style: TextStyle(
+                        Text(
+                          tr(context, 'Linked Patients', 'المرضى المرتبطين'),
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.teal900,
@@ -293,18 +299,18 @@ class FamilyDashboard extends StatelessWidget {
                         }
 
                         if (snapshot.hasError) {
-                          return const Text(
-                            'Error loading patients',
-                            style: TextStyle(color: Colors.red),
+                          return Text(
+                            tr(context, 'Error loading patients', 'خطأ في تحميل المرضى'),
+                            style: const TextStyle(color: Colors.red),
                           );
                         }
 
                         final patients = snapshot.data ?? [];
 
                         if (patients.isEmpty) {
-                          return const Text(
-                            'No patients linked yet',
-                            style: TextStyle(
+                          return Text(
+                            tr(context, 'No patients linked yet', 'لا يوجد مرضى مرتبطين بعد'),
+                            style: const TextStyle(
                               fontSize: 14,
                               color: AppTheme.gray500,
                             ),
@@ -340,7 +346,7 @@ class FamilyDashboard extends StatelessWidget {
                                   ),
                           ),
                           title: Text(
-                            patient['name'] ?? 'Unknown',
+                            patient['name'] ?? tr(context, 'Unknown', 'غير معروف'),
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                             ),
@@ -390,7 +396,7 @@ class FamilyDashboard extends StatelessWidget {
                     
                     if (youtubeId != null && youtubeId.isNotEmpty) {
                       videoTips.add(VideoTip(
-                        title: advice.title ?? 'Doctor Advice Video',
+                        title: advice.title ?? tr(context, 'Doctor Advice Video', 'فيديو نصيحة الطبيب'),
                         youtubeId: youtubeId,
                       ));
                     }
@@ -442,7 +448,7 @@ class FamilyDashboard extends StatelessWidget {
                               await launchUrl(uri);
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Could not make phone call')),
+                                SnackBar(content: Text(tr(context, 'Could not make phone call', 'تعذّر إجراء المكالمة'))),
                               );
                             }
                           }
@@ -470,9 +476,9 @@ class FamilyDashboard extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Emergency Contact',
-                                  style: TextStyle(
+                                Text(
+                                  tr(context, 'Emergency Contact', 'جهة الطوارئ'),
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.red,
@@ -481,8 +487,8 @@ class FamilyDashboard extends StatelessWidget {
                                 const SizedBox(height: 4),
                                 Text(
                                   doctorPhone != null
-                                      ? 'Tap to call $doctorName'
-                                      : 'No doctor assigned',
+                                      ? tr(context, 'Tap to call $doctorName', 'اضغط للاتصال بـ $doctorName')
+                                      : tr(context, 'No doctor assigned', 'لم يتم تعيين طبيب'),
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: Colors.red,
@@ -529,6 +535,12 @@ class VideoTipsSection extends StatelessWidget {
     required this.onOpen,
   });
 
+  bool _isAr(BuildContext context) =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(BuildContext context, String en, String ar) =>
+      _isAr(context) ? ar : en;
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -539,9 +551,9 @@ class VideoTipsSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // header
-            const Text(
-              'Video Tips',
-              style: TextStyle(
+            Text(
+              tr(context, 'Video Tips', 'نصائح الفيديو'),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.teal900,
@@ -577,11 +589,17 @@ class _DoctorAdviceCard extends StatelessWidget {
     required this.onOpenVideo,
   });
 
+  bool _isAr(BuildContext context) =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(BuildContext context, String en, String ar) =>
+      _isAr(context) ? ar : en;
+
   void _showAllTipsDialog(BuildContext context, DoctorAdviceModel advice) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('All Tips'),
+        title: Text(tr(context, 'All Tips', 'جميع النصائح')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -630,7 +648,7 @@ class _DoctorAdviceCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: Text(tr(context, 'Close', 'إغلاق')),
           ),
         ],
       ),
@@ -661,9 +679,9 @@ class _DoctorAdviceCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  'Doctor Advice',
-                  style: TextStyle(
+                Text(
+                  tr(context, 'Doctor Advice', 'نصائح الطبيب'),
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.teal900,
@@ -673,7 +691,7 @@ class _DoctorAdviceCard extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: () => loadAdvice(),
-                  tooltip: 'Refresh advice',
+                  tooltip: tr(context, 'Refresh advice', 'تحديث النصائح'),
                 ),
               ],
             ),
@@ -689,17 +707,17 @@ class _DoctorAdviceCard extends StatelessWidget {
                 }
 
                 if (snapshot.hasError) {
-                  return const Text(
-                    'Could not load advice right now.',
-                    style: TextStyle(color: Colors.red),
+                  return Text(
+                    tr(context, 'Could not load advice right now.', 'تعذّر تحميل النصائح الآن.'),
+                    style: const TextStyle(color: Colors.red),
                   );
                 }
 
                 final advices = snapshot.data ?? [];
                 if (advices.isEmpty) {
-                  return const Text(
-                    'No advice shared yet. Your doctor can send tips and videos here.',
-                    style: TextStyle(
+                  return Text(
+                    tr(context, 'No advice shared yet. Your doctor can send tips and videos here.', 'لم يتم مشاركة نصائح بعد. يمكن لطبيبك إرسال النصائح والفيديوهات هنا.'),
+                    style: const TextStyle(
                       fontSize: 14,
                       color: AppTheme.gray500,
                     ),
@@ -756,9 +774,9 @@ class _DoctorAdviceCard extends StatelessWidget {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Text(
-                                            'Tip',
-                                            style: TextStyle(
+                                          Text(
+                                            tr(context, 'Tip', 'نصيحة'),
+                                            style: const TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w600,
                                               color: AppTheme.teal600,
@@ -776,7 +794,9 @@ class _DoctorAdviceCard extends StatelessWidget {
                                           if (advice.tips.length > 1) ...[
                                             const SizedBox(height: 8),
                                             Text(
-                                              '${advice.tips.length - 1} more tip${advice.tips.length > 2 ? 's' : ''}',
+                                              tr(context, 
+                                                '${advice.tips.length - 1} more tip${advice.tips.length > 2 ? 's' : ''}',
+                                                '${advice.tips.length - 1} نصيحة أخرى'),
                                               style: const TextStyle(
                                                 fontSize: 13,
                                                 color: AppTheme.teal600,
@@ -803,7 +823,7 @@ class _DoctorAdviceCard extends StatelessWidget {
                                   _showAllTipsDialog(context, advice);
                                 },
                                 icon: const Icon(Icons.tips_and_updates),
-                                label: Text('View all ${advice.tips.length} tips'),
+                                label: Text(tr(context, 'View all ${advice.tips.length} tips', 'عرض جميع النصائح ${advice.tips.length}')),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppTheme.teal600,
                                   side: const BorderSide(color: AppTheme.teal200),
@@ -844,6 +864,11 @@ class _InlineVideoPlayer extends StatefulWidget {
 }
 
 class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
+  bool _isAr(BuildContext context) =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(BuildContext context, String en, String ar) =>
+      _isAr(context) ? ar : en;
   VideoPlayerController? _controller;
   bool _isInitialized = false;
   bool _isPlaying = false;
@@ -937,9 +962,9 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
                         const Icon(Icons.error_outline,
                             color: Colors.white, size: 48),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Failed to load video',
-                          style: TextStyle(color: Colors.white),
+                        Text(
+                          tr(context, 'Failed to load video', 'فشل تحميل الفيديو'),
+                          style: const TextStyle(color: Colors.white),
                         ),
                         const SizedBox(height: 8),
                         TextButton.icon(
@@ -951,7 +976,7 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
                             _initializeVideo();
                           },
                           icon: const Icon(Icons.refresh, color: Colors.white),
-                          label: const Text('Retry', style: TextStyle(color: Colors.white)),
+                          label: Text(tr(context, 'Retry', 'إعادة المحاولة'), style: const TextStyle(color: Colors.white)),
                         ),
                       ],
                     ),
@@ -1084,9 +1109,9 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Tap to play video',
-            style: TextStyle(
+          Text(
+            tr(context, 'Tap to play video', 'اضغط لتشغيل الفيديو'),
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -1107,14 +1132,18 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
 
 class _AdviceVideoPlayer extends StatefulWidget {
   final String url;
-  final Future<void> Function(String url)? onOpenExternally;
-  const _AdviceVideoPlayer({required this.url, this.onOpenExternally});
+  const _AdviceVideoPlayer({required this.url});
 
   @override
   State<_AdviceVideoPlayer> createState() => _AdviceVideoPlayerState();
 }
 
 class _AdviceVideoPlayerState extends State<_AdviceVideoPlayer> {
+  bool _isAr(BuildContext context) =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(BuildContext context, String en, String ar) =>
+      _isAr(context) ? ar : en;
   VideoPlayerController? _controller;
   Future<void>? _initFuture;
   bool _isError = false;
@@ -1156,11 +1185,14 @@ class _AdviceVideoPlayerState extends State<_AdviceVideoPlayer> {
         ),
         child: Center(
           child: TextButton.icon(
-            onPressed: widget.onOpenExternally == null
-                ? null
-                : () => widget.onOpenExternally!(widget.url),
+            onPressed: () async {
+              final uri = Uri.tryParse(widget.url);
+              if (uri != null) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
             icon: const Icon(Icons.open_in_new),
-            label: const Text('Open video'),
+            label: Text(tr(context, 'Open video', 'فتح الفيديو')),
           ),
         ),
       );
@@ -1224,11 +1256,14 @@ class _AdviceVideoPlayerState extends State<_AdviceVideoPlayer> {
                   ),
                 ),
                 TextButton.icon(
-                  onPressed: widget.onOpenExternally == null
-                      ? null
-                      : () => widget.onOpenExternally!(widget.url),
+                  onPressed: () async {
+                    final uri = Uri.tryParse(widget.url);
+                    if (uri != null) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
                   icon: const Icon(Icons.fullscreen),
-                  label: const Text('Open full screen'),
+                  label: Text(tr(context, 'Open full screen', 'فتح ملء الشاشة')),
                 ),
               ],
             ),

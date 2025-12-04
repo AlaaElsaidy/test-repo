@@ -2,12 +2,17 @@ import 'package:alzcare/config/router/routes.dart';
 import 'package:alzcare/core/shared-prefrences/shared-prefrences-helper.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../../main.dart' show appStateInstance;
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isAr =
+        (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+    String tr(String en, String ar) => isAr ? ar : en;
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -20,6 +25,26 @@ class RoleSelectionScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // Language switcher button (top right)
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: IconButton(
+                      icon: Icon(
+                        isAr ? Icons.language : Icons.translate,
+                        color: AppTheme.teal600,
+                        size: 28,
+                      ),
+                      tooltip: isAr ? 'English' : 'العربية',
+                      onPressed: () {
+                        if (appStateInstance != null) {
+                          final newLocale = isAr ? const Locale('en') : const Locale('ar');
+                          appStateInstance!.changeLanguage(newLocale);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
                   // Logo
                   Container(
                     width: 80,
@@ -37,19 +62,20 @@ class RoleSelectionScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Title
-                  const Text(
+                  Text(
                     'Memora',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.teal900,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Compassionate Care for Alzheimer\'s Patients',
+                  Text(
+                    tr('Compassionate Care for Alzheimer\'s Patients',
+                        'رعاية رحيمة لمرضى الزهايمر'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                       color: AppTheme.teal600,
                     ),
@@ -73,9 +99,9 @@ class RoleSelectionScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        const Text(
-                          'Select Your Role',
-                          style: TextStyle(
+                        Text(
+                          tr('Select Your Role', 'اختر دورك في التطبيق'),
+                          style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.teal900,
@@ -86,7 +112,7 @@ class RoleSelectionScreen extends StatelessWidget {
                         // Patient Button
                         _RoleButton(
                           icon: Icons.person,
-                          label: 'Patient Portal',
+                          label: tr('Patient Portal', 'واجهة المريض'),
                           onPressed: () {
                             SharedPrefsHelper.saveString('selectedRole', 'patient');
                             Navigator.pushNamed(context, AppRoutes.login);
@@ -97,7 +123,7 @@ class RoleSelectionScreen extends StatelessWidget {
                         // Doctor Button
                         _RoleButton(
                           icon: Icons.medical_services,
-                          label: 'Doctor Portal',
+                          label: tr('Doctor Portal', 'واجهة الطبيب'),
                           onPressed: () {
                             SharedPrefsHelper.saveString('selectedRole', 'doctor');
                             Navigator.pushNamed(context, AppRoutes.login);
@@ -108,7 +134,7 @@ class RoleSelectionScreen extends StatelessWidget {
                         // Family Button
                         _RoleButton(
                           icon: Icons.family_restroom,
-                          label: 'Family Member Portal',
+                          label: tr('Family Member Portal', 'واجهة القريب'),
                           onPressed: () {
                             SharedPrefsHelper.saveString('selectedRole', 'family');
                             Navigator.pushNamed(context, AppRoutes.login);

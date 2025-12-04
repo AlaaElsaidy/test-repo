@@ -35,6 +35,11 @@ class _SignInScreenState extends State<SignInScreen> {
   String? _selectedRole;
   bool _patientOnboarded = false;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -65,7 +70,7 @@ class _SignInScreenState extends State<SignInScreen> {
               showErrorDialog(
                   context: context,
                   error: state.errorMessage,
-                  title: "Login Failed!");
+                  title: tr('Login Failed!', 'فشل تسجيل الدخول!'));
             }
             if (state is LoginSuccess) {
               print(state.authResponse.user!.id);
@@ -78,7 +83,7 @@ class _SignInScreenState extends State<SignInScreen> {
               showErrorDialog(
                   context: context,
                   error: state.errorMessage,
-                  title: "Login Failed!");
+                  title: tr('Login Failed!', 'فشل تسجيل الدخول!'));
             }
             if (state is GetUserSuccess) {
               var user = UserModel.fromJson(state.user!);
@@ -157,7 +162,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           children: [
                             SizedBox(height: context.h(16)),
                             Text(
-                              'Welcome Back!',
+                              tr('Welcome Back!', 'مرحبًا بعودتك!'),
                               style: TextStyle(
                                 color: const Color(0xFF0E3E3B),
                                 fontWeight: FontWeight.w800,
@@ -166,7 +171,8 @@ class _SignInScreenState extends State<SignInScreen> {
                             ),
                             SizedBox(height: context.h(6)),
                             Text(
-                              'Sign in with your email',
+                              tr('Sign in with your email',
+                                  'سجّل دخولك باستخدام بريدك الإلكتروني'),
                               style: TextStyle(
                                 color: const Color(0xFF7EA9A3),
                                 fontWeight: FontWeight.w600,
@@ -210,7 +216,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Account Information',
+                                        tr('Account Information',
+                                            'بيانات الحساب'),
                                         style: TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: context.sp(18),
@@ -222,7 +229,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                                       // Email
                                       Text(
-                                        'Email Address',
+                                        tr('Email Address', 'البريد الإلكتروني'),
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -238,7 +245,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                           textEditingController:
                                               _emailController,
                                           validator: (v) => emailValidator(v),
-                                          hintText: "example@mail.com",
+                                          hintText:
+                                              tr('example@mail.com', 'example@mail.com'),
                                           textInputType:
                                               TextInputType.emailAddress,
                                         ),
@@ -248,7 +256,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                                       // Password
                                       Text(
-                                        'Password',
+                                        tr('Password', 'كلمة المرور'),
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: context.sp(14),
@@ -264,7 +272,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                               _passwordController,
                                           // No validation on login password for now
                                           validator: (_) => null,
-                                          hintText: "••••••••",
+                                          hintText: _isAr ? '••••••••' : '••••••••',
                                           textInputType: TextInputType.text,
                                           secure: true,
                                         ),
@@ -294,7 +302,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                           ),
                                           const SizedBox(width: 4),
                                           Text(
-                                            'Remember me',
+                                            tr('Remember me', 'تذكرني'),
                                             style: TextStyle(
                                               color: const Color(0xFF2E5753),
                                               fontSize: context.sp(14),
@@ -313,7 +321,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                                       .shrinkWrap,
                                             ),
                                             child: Text(
-                                              'Forgot password?',
+                                              tr('Forgot password?',
+                                                  'هل نسيت كلمة المرور؟'),
                                               style: TextStyle(
                                                 color: AppColors.primaryColor,
                                                 fontWeight: FontWeight.w700,
@@ -345,8 +354,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                           },
                                           text: state is GetUserLoading ||
                                                   state is LoginLoading
-                                              ? "Loading..."
-                                              : "Login",
+                                              ? tr('Loading...', 'جارٍ التحميل...')
+                                              : tr('Login', 'تسجيل الدخول'),
                                         ),
                                       ),
                                     ],
@@ -368,7 +377,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                   );
                                 },
                                 icon: const Icon(Icons.vpn_key),
-                                label: const Text('Have an invitation code?'),
+                                label: Text(tr('Have an invitation code?',
+                                    'هل لديك كود دعوة؟')),
                               ),
                               SizedBox(height: context.h(8)),
                             ],

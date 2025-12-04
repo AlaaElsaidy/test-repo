@@ -27,6 +27,11 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
   final SafeZoneService _safeZoneService = SafeZoneService();
   final PatientFamilyService _patientFamilyService = PatientFamilyService();
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   // Patient data
   String? _patientName;
   String? _selectedPatientUserId;
@@ -93,7 +98,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
         if (firstPatient != null) {
           final userId = firstPatient['user_id'] as String?;
           final recordId = firstPatient['id'] as String?;
-          final name = firstPatient['name'] as String? ?? 'Patient';
+          final name = firstPatient['name'] as String? ?? tr('Patient', 'مريض');
           
           debugPrint('Selecting patient - userId: $userId, recordId: $recordId, name: $name');
           
@@ -322,9 +327,22 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
 
   String _timeAgo(DateTime t) {
     final d = DateTime.now().difference(t);
-    if (d.inMinutes < 1) return 'Just now';
-    if (d.inMinutes < 60) return '${d.inMinutes} min${d.inMinutes > 1 ? 's' : ''} ago';
-    if (d.inHours < 24) return '${d.inHours} hour${d.inHours > 1 ? 's' : ''} ago';
+    if (d.inMinutes < 1) return tr('Just now', 'الآن');
+    if (d.inMinutes < 60) {
+      if (_isAr) {
+        return 'منذ ${d.inMinutes} دقيقة';
+      }
+      return '${d.inMinutes} min${d.inMinutes > 1 ? 's' : ''} ago';
+    }
+    if (d.inHours < 24) {
+      if (_isAr) {
+        return 'منذ ${d.inHours} ساعة';
+      }
+      return '${d.inHours} hour${d.inHours > 1 ? 's' : ''} ago';
+    }
+    if (_isAr) {
+      return 'منذ ${d.inDays} يوم';
+    }
     return '${d.inDays} day${d.inDays > 1 ? 's' : ''} ago';
   }
 
@@ -337,7 +355,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
     required double lng,
     String? label,
   }) async {
-    final String qLabel = label ?? 'Patient';
+    final String qLabel = label ?? tr('Patient', 'مريض');
     final encodedLabel = Uri.encodeComponent(qLabel);
 
     final Uri appleMaps =
@@ -373,7 +391,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
       if (!serviceEnabled) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please enable Location Services')),
+            SnackBar(content: Text(tr('Please enable Location Services', 'يرجى تفعيل خدمات الموقع'))),
           );
         }
         return null;
@@ -386,7 +404,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
           permission == LocationPermission.deniedForever) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission denied')),
+            SnackBar(content: Text(tr('Location permission denied', 'تم رفض إذن الموقع'))),
           );
         }
         return null;
@@ -408,7 +426,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
   void _openAddSafeZoneSheet({
     required void Function(_SafeZone) onAdd,
   }) {
-    final nameCtrl = TextEditingController(text: 'New Zone');
+    final nameCtrl = TextEditingController(text: tr('New Zone', 'منطقة جديدة'));
     final addrCtrl = TextEditingController(text: '');
     final latCtrl = TextEditingController(
         text: _patient?.lat.toStringAsFixed(6) ?? '0.0');
@@ -447,9 +465,9 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Add Safe Zone',
-                        style: TextStyle(
+                      Text(
+                        tr('Add Safe Zone', 'إضافة منطقة آمنة'),
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.teal900,
@@ -464,23 +482,23 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                         children: [
                           if (_patient != null)
                             ActionChip(
-                              label: const Text('Use patient location'),
+                              label: Text(tr('Use patient location', 'استخدام موقع المريض')),
                               avatar:
                                   const Icon(Icons.person_pin_circle, size: 18),
                               onPressed: () => useCoords(
                                 _patient!.lat,
                                 _patient!.lng,
-                                name: 'Patient Location',
+                                name: tr('Patient Location', 'موقع المريض'),
                               ),
                             ),
                           ActionChip(
-                            label: const Text('Use my current location'),
+                            label: Text(tr('Use my current location', 'استخدام موقعي الحالي')),
                             avatar: const Icon(Icons.my_location, size: 18),
                             onPressed: () async {
                               final here = await _getMyCurrentLocation();
                               if (here != null) {
                                 useCoords(here.lat, here.lng,
-                                    name: 'My Current Location');
+                                    name: tr('My Current Location', 'موقعي الحالي'));
                               }
                             },
                           ),
@@ -490,10 +508,10 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                             final address = h['address'] as String?;
                             if (lat == null || lng == null) return const SizedBox();
                             return ActionChip(
-                              label: Text(address?.split(',').first ?? 'Location'),
+                              label: Text(address?.split(',').first ?? tr('Location', 'موقع')),
                               avatar: const Icon(Icons.place, size: 18),
                               onPressed: () => useCoords(lat, lng,
-                                  name: address?.split(',').first ?? 'Location',
+                                  name: address?.split(',').first ?? tr('Location', 'موقع'),
                                   address: address),
                             );
                           }),
@@ -502,23 +520,23 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
 
                       const SizedBox(height: 16),
                       _LabeledField(
-                        label: 'Name',
+                        label: tr('Name', 'الاسم'),
                         child: TextField(
                           controller: nameCtrl,
-                          decoration: const InputDecoration(
-                            hintText: 'e.g., Home, Park, Clinic',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            hintText: tr('e.g., Home, Park, Clinic', 'مثال: المنزل، الحديقة، العيادة'),
+                            border: const OutlineInputBorder(),
                           ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       _LabeledField(
-                        label: 'Address',
+                        label: tr('Address', 'العنوان'),
                         child: TextField(
                           controller: addrCtrl,
-                          decoration: const InputDecoration(
-                            hintText: 'Optional address/description',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            hintText: tr('Optional address/description', 'عنوان/وصف اختياري'),
+                            border: const OutlineInputBorder(),
                           ),
                         ),
                       ),
@@ -527,7 +545,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                         children: [
                           Expanded(
                             child: _LabeledField(
-                              label: 'Latitude',
+                              label: tr('Latitude', 'خط العرض'),
                               child: TextField(
                                 controller: latCtrl,
                                 keyboardType:
@@ -544,7 +562,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: _LabeledField(
-                              label: 'Longitude',
+                              label: tr('Longitude', 'خط الطول'),
                               child: TextField(
                                 controller: lngCtrl,
                                 keyboardType:
@@ -563,7 +581,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                       const SizedBox(height: 12),
 
                       _LabeledField(
-                        label: 'Radius: ${radius.toInt()} m',
+                        label: tr('Radius', 'نصف القطر') + ': ${radius.toInt()} ${tr('m', 'م')}',
                         child: Slider(
                           min: 50,
                           max: 500,
@@ -586,9 +604,9 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                                 activeColor: AppTheme.teal500,
                               ),
                               const SizedBox(width: 8),
-                              const Text(
-                                'Active',
-                                style: TextStyle(
+                              Text(
+                                tr('Active', 'نشط'),
+                                style: const TextStyle(
                                   color: AppTheme.teal900,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -601,9 +619,9 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                               final lng = double.tryParse(lngCtrl.text);
                               if (lat == null || lng == null) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
+                                  SnackBar(
                                       content:
-                                          Text('Enter valid lat/lng first')),
+                                          Text(tr('Enter valid lat/lng first', 'أدخل إحداثيات صحيحة أولاً'))),
                                 );
                                 return;
                               }
@@ -611,12 +629,12 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                                 lat: lat,
                                 lng: lng,
                                 label: nameCtrl.text.isEmpty
-                                    ? 'Safe Zone'
+                                    ? tr('Safe Zone', 'منطقة آمنة')
                                     : nameCtrl.text,
                               );
                             },
                             icon: const Icon(Icons.map),
-                            label: const Text('Preview in Maps'),
+                            label: Text(tr('Preview in Maps', 'معاينة في الخرائط')),
                           ),
                         ],
                       ),
@@ -627,16 +645,16 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             final name = nameCtrl.text.trim().isEmpty
-                                ? 'New Zone'
+                                ? tr('New Zone', 'منطقة جديدة')
                                 : nameCtrl.text.trim();
                             final address = addrCtrl.text.trim();
                             final lat = double.tryParse(latCtrl.text);
                             final lng = double.tryParse(lngCtrl.text);
                             if (lat == null || lng == null) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
+                                SnackBar(
                                     content:
-                                        Text('Please enter valid coordinates')),
+                                        Text(tr('Please enter valid coordinates', 'يرجى إدخال إحداثيات صحيحة'))),
                               );
                               return;
                             }
@@ -652,7 +670,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                             Navigator.pop(context); // close add sheet
                           },
                           icon: const Icon(Icons.save),
-                          label: const Text('Save Safe Zone'),
+                          label: Text(tr('Save Safe Zone', 'حفظ المنطقة الآمنة')),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.teal500,
                             foregroundColor: Colors.white,
@@ -692,16 +710,16 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Live Tracking',
-                            style: TextStyle(
+                          Text(
+                            tr('Live Tracking', 'التتبع المباشر'),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            _patientName ?? 'Select Patient',
+                            _patientName ?? tr('Select Patient', 'اختر مريض'),
                             style: const TextStyle(
                               color: Color(0xFFCFFAFE),
                               fontSize: 14,
@@ -733,7 +751,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                     children: [
                       Expanded(
                         child: _TabButton(
-                          label: 'Live',
+                          label: tr('Live', 'مباشر'),
                           icon: Icons.location_on,
                           isSelected: _selectedTab == 0,
                           onTap: () => setState(() => _selectedTab = 0),
@@ -741,7 +759,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                       ),
                       Expanded(
                         child: _TabButton(
-                          label: 'Safe Zones',
+                          label: tr('Safe Zones', 'المناطق الآمنة'),
                           icon: Icons.shield,
                           isSelected: _selectedTab == 1,
                           onTap: () => setState(() => _selectedTab = 1),
@@ -749,7 +767,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                       ),
                       Expanded(
                         child: _TabButton(
-                          label: 'History',
+                          label: tr('History', 'السجل'),
                           icon: Icons.history,
                           isSelected: _selectedTab == 2,
                           onTap: () => setState(() => _selectedTab = 2),
@@ -769,13 +787,13 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                     ? Center(
                         child: _loadingLocation
                             ? const CircularProgressIndicator()
-                            : const Text('No location data available'),
+                            : Text(tr('No location data available', 'لا توجد بيانات موقع متاحة')),
                       )
                     : _LiveTrackingView(
                         isInsideAny: _isInsideAnyActiveZone,
                         statusText: _isInsideAnyActiveZone
-                            ? 'Safe Zone'
-                            : 'Outside Zone',
+                            ? tr('Safe Zone', 'منطقة آمنة')
+                            : tr('Outside Zone', 'خارج المنطقة'),
                         statusColor: _isInsideAnyActiveZone
                             ? Colors.green
                             : Colors.red,
@@ -827,20 +845,20 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                               final confirmed = await showDialog<bool>(
                                     context: context,
                                     builder: (_) => AlertDialog(
-                                      title: const Text('Delete Safe Zone'),
+                                      title: Text(tr('Delete Safe Zone', 'حذف المنطقة الآمنة')),
                                       content: Text(
-                                          'Are you sure you want to delete "${z.name}"?'),
+                                          tr('Are you sure you want to delete "${z.name}"?', 'هل أنت متأكد أنك تريد حذف "${z.name}"؟')),
                                       actions: [
                                         TextButton(
                                           onPressed: () =>
                                               Navigator.pop(context, false),
-                                          child: const Text('Cancel'),
+                                          child: Text(tr('Cancel', 'إلغاء')),
                                         ),
                                         TextButton(
                                           onPressed: () =>
                                               Navigator.pop(context, true),
-                                          child: const Text('Delete',
-                                              style: TextStyle(color: Colors.red)),
+                                          child: Text(tr('Delete', 'حذف'),
+                                              style: const TextStyle(color: Colors.red)),
                                         ),
                                       ],
                                     ),
@@ -876,7 +894,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                                 } catch (e) {
                                   if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Failed to add: $e')),
+                                      SnackBar(content: Text(tr('Failed to add', 'فشل الإضافة') + ': $e')),
                                     );
                                   }
                                 }
@@ -886,8 +904,8 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                     : _loadingHistory
                         ? const Center(child: CircularProgressIndicator())
                         : _history.isEmpty
-                            ? const Center(
-                                child: Text('No location history available'),
+                            ? Center(
+                                child: Text(tr('No location history available', 'لا يوجد سجل مواقع متاح')),
                               )
                             : _HistoryView(
                                 entries: _history.map((h) {
@@ -899,7 +917,7 @@ class _FamilyTrackingScreenState extends State<FamilyTrackingScreen> {
                                       : DateTime.now();
                                   
                                   // Determine place name from address or coordinates
-                                  String place = 'Unknown';
+                                  String place = tr('Unknown', 'غير معروف');
                                   IconData icon = Icons.place;
                                   Color color = AppTheme.teal500;
                                   
@@ -1071,6 +1089,11 @@ class _LiveTrackingView extends StatelessWidget {
     required this.onRecenter,
   });
 
+  String _tr(BuildContext context, String en, String ar) {
+    final isAr = (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+    return isAr ? ar : en;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -1173,9 +1196,9 @@ class _LiveTrackingView extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Current Location',
-                          style: TextStyle(
+                        Text(
+                          _tr(context, 'Current Location', 'الموقع الحالي'),
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.teal900,
@@ -1191,7 +1214,7 @@ class _LiveTrackingView extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Last updated: $lastUpdatedLabel',
+                          _tr(context, 'Last updated', 'آخر تحديث') + ': $lastUpdatedLabel',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.gray500,
@@ -1213,7 +1236,7 @@ class _LiveTrackingView extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: onDirections,
                   icon: const Icon(Icons.directions),
-                  label: const Text('Get Directions to Patient'),
+                  label: Text(_tr(context, 'Get Directions to Patient', 'الحصول على اتجاهات للمريض')),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.teal500,
                     foregroundColor: Colors.white,
@@ -1247,6 +1270,11 @@ class _SafeZonesEditorView extends StatelessWidget {
     required this.onAddPressed,
   });
 
+  String _tr(BuildContext context, String en, String ar) {
+    final isAr = (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+    return isAr ? ar : en;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1255,7 +1283,7 @@ class _SafeZonesEditorView extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            'Safe Zones • $patientName',
+            '${_tr(context, 'Safe Zones', 'المناطق الآمنة')} • $patientName',
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -1264,12 +1292,12 @@ class _SafeZonesEditorView extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (zones.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32.0),
+            Padding(
+              padding: const EdgeInsets.all(32.0),
               child: Center(
                 child: Text(
-                  'No safe zones yet. Add one to get started.',
-                  style: TextStyle(color: AppTheme.gray500),
+                  _tr(context, 'No safe zones yet. Add one to get started.', 'لا توجد مناطق آمنة بعد. أضف واحدة للبدء.'),
+                  style: const TextStyle(color: AppTheme.gray500),
                 ),
               ),
             )
@@ -1296,7 +1324,7 @@ class _SafeZonesEditorView extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: onAddPressed,
               icon: const Icon(Icons.add),
-              label: const Text('Add New Safe Zone'),
+              label: Text(_tr(context, 'Add New Safe Zone', 'إضافة منطقة آمنة جديدة')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.teal500,
                 foregroundColor: Colors.white,
@@ -1320,6 +1348,11 @@ class _HistoryView extends StatelessWidget {
     required this.onOpenMap,
   });
 
+  String _tr(BuildContext context, String en, String ar) {
+    final isAr = (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+    return isAr ? ar : en;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1327,18 +1360,18 @@ class _HistoryView extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Location History',
-            style: TextStyle(
+          Text(
+            _tr(context, 'Location History', 'سجل المواقع'),
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: AppTheme.teal900,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Places visited recently',
-            style: TextStyle(
+          Text(
+            _tr(context, 'Places visited recently', 'الأماكن التي تم زيارتها مؤخراً'),
+            style: const TextStyle(
               fontSize: 14,
               color: AppTheme.gray600,
             ),
@@ -1380,6 +1413,11 @@ class _HistoryItem extends StatelessWidget {
     required this.color,
     required this.onDirections,
   });
+
+  String _tr(BuildContext context, String en, String ar) {
+    final isAr = (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+    return isAr ? ar : en;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1458,7 +1496,7 @@ class _HistoryItem extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onDirections,
                 icon: const Icon(Icons.directions, size: 18),
-                label: const Text('Directions'),
+                label: Text(_tr(context, 'Directions', 'الاتجاهات')),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppTheme.teal600,
                   side: const BorderSide(color: AppTheme.teal500),

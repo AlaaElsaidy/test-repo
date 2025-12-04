@@ -25,6 +25,11 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   List<Map<String, dynamic>> _todayAppointments = [];
   bool _loading = true;
 
+  bool get _isAr =>
+      (Localizations.maybeLocaleOf(context)?.languageCode ?? 'en') == 'ar';
+
+  String tr(String en, String ar) => _isAr ? ar : en;
+
   @override
   void initState() {
     super.initState();
@@ -193,9 +198,9 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Welcome Back',
-                                  style: TextStyle(
+                                Text(
+                                  tr('Welcome Back', 'مرحباً بعودتك'),
+                                  style: const TextStyle(
                                     color: Color(0xFFCFFAFE),
                                     fontSize: 16,
                                   ),
@@ -226,7 +231,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                           width: isNarrow ? double.infinity : (width - 16 * 2 - 12) / 2,
                           child: StatCard(
                             icon: Icons.people,
-                            label: 'Active Patients',
+                            label: tr('Active Patients', 'المرضى النشطين'),
                             value: '$_activePatientsCount',
                             color: AppTheme.teal500,
                             backgroundColor: AppTheme.teal50,
@@ -236,7 +241,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                           width: isNarrow ? double.infinity : (width - 16 * 2 - 12) / 2,
                           child: StatCard(
                             icon: Icons.calendar_today,
-                            label: 'Appointments',
+                            label: tr('Appointments', 'المواعيد'),
                             value: '$_appointmentsCount',
                             color: AppTheme.cyan500,
                             backgroundColor: AppTheme.cyan50,
@@ -256,12 +261,12 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Expanded(
+                            Expanded(
                               child: Text(
-                                'Today\'s Appointments',
+                                tr('Today\'s Appointments', 'مواعيد اليوم'),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.teal900,
@@ -270,18 +275,18 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                             ),
                             TextButton(
                               onPressed: () {},
-                              child: const Text('View All'),
+                              child: Text(tr('View All', 'عرض الكل')),
                             ),
                           ],
                             ),
                             const SizedBox(height: 16),
                             if (_todayAppointments.isEmpty)
-                              const Center(
+                              Center(
                                 child: Padding(
-                                  padding: EdgeInsets.all(16.0),
+                                  padding: const EdgeInsets.all(16.0),
                                   child: Text(
-                                    'No appointments today',
-                                    style: TextStyle(
+                                    tr('No appointments today', 'لا توجد مواعيد اليوم'),
+                                    style: const TextStyle(
                                       color: AppTheme.gray500,
                                     ),
                                   ),
@@ -291,10 +296,10 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                               ..._todayAppointments.map((appointment) {
                                 final String patientName =
                                     (appointment['patient_name'] as String?) ??
-                                        'Unknown';
+                                        tr('Unknown', 'غير معروف');
 
                                 // time يُخزن كسلسلة "HH:MM:SS" حسب المايجريشن
-                                String time = 'Unknown';
+                                String time = tr('Unknown', 'غير معروف');
                                 final rawTime = appointment['time'] as String?;
                                 if (rawTime != null && rawTime.isNotEmpty) {
                                   try {
@@ -313,11 +318,11 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
-                                  child: _AppointmentItem(
+                                  child:                                   _AppointmentItem(
                                     patientName: patientName,
                                     time: time,
-                                    type: 'Consultation',
-                                    status: 'Upcoming',
+                                    type: tr('Consultation', 'استشارة'),
+                                    status: tr('Upcoming', 'قادم'),
                                     statusColor: AppTheme.teal500,
                                   ),
                                 );
